@@ -734,4 +734,20 @@ render();
 // インストールできるかの知らせ（beforeinstallprompt）は少し遅れて来るので、待ってから案内を出す
 setTimeout(showInstallCard, 2500);
 
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+// 新しい版を公開したら、次に開いたときに自動で入れ替える
+if ('serviceWorker' in navigator) {
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register('sw.js').then((reg) => {
+    // ホーム画面のアプリは開きっぱなしになりがちなので、画面に戻ってきたときにも新しい版を確かめる
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') reg.update().catch(() => {});
+    });
+  }).catch(() => {});
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    // 初めて入れたときと、入力の途中（画面が開いている）ときは読み込み直さない
+    if (!hadController || reloaded || document.querySelector('dialog[open]')) return;
+    reloaded = true;
+    location.reload();
+  });
+}
