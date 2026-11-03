@@ -3,7 +3,7 @@
   "short_name": "拉麺帖",
   "description": "行ったラーメン屋を、店名ですぐ引ける記録帳",
   "lang": "ja",
-  "id": "./",
+  "id": "/ramen-log/?app=ramenlog-2",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
