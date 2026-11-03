@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#1f3a5f">
+  <meta name="description" content="行ったラーメン屋を、店名ですぐ引ける記録帳">
+  <title>拉麺帖</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="noren">
+    <h1>拉麺帖</h1>
+    <p>行った店を、店名ですぐ引ける</p>
+  </header>
+
+  <main class="wrap">
+    <div class="stats">
+      <div class="s"><b id="statYear">0</b>今年の杯数</div>
+      <div class="s"><b id="statShops">0</b>行った店</div>
+      <div class="s"><b id="statMonth">0</b>今月</div>
+    </div>
+
+    <input id="search" class="search" type="search" placeholder="店名で探す" autocomplete="off" enterkeyhint="search">
+
+    <section id="nearbySection">
+      <h2>近くの店</h2>
+      <button id="findNearby" class="wide">📍 今いる場所から店を探す</button>
+      <p id="nearbyStatus" class="note" hidden></p>
+      <table id="nearbyTable" hidden><tbody></tbody></table>
+      <button id="addManual" class="link" hidden>＋ 地図にない店を足す</button>
+    </section>
+
+    <section>
+      <h2 id="listTitle">行った店（回数順）</h2>
+      <table id="visitedTable"><tbody></tbody></table>
+      <p id="emptyNote" class="note">まだ記録がないよ。お店で「今いる場所から店を探す」を押してね。</p>
+    </section>
+
+    <section>
+      <h2>バックアップ</h2>
+      <p id="backupNote" class="note"></p>
+      <div class="row">
+        <button id="exportBtn" class="sub">書き出す（保存）</button>
+        <button id="importBtn" class="sub">読み込む</button>
+        <input id="importFile" type="file" accept="application/json,.json" hidden>
+      </div>
+    </section>
+
+    <p class="credit">店のデータ © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors</p>
+  </main>
+
+  <!-- 店の詳細 -->
+  <dialog id="shopDialog">
+    <form method="dialog" class="dlg">
+      <div class="dlg-head">
+        <h3 id="shopName"></h3>
+        <button class="x" value="close" aria-label="閉じる">×</button>
+      </div>
+      <p id="shopSummary" class="note"></p>
+      <ul id="visitList" class="visits"></ul>
+      <div class="row">
+        <button type="button" id="addVisitBtn" class="go">今日も行った</button>
+        <button type="button" id="renameBtn" class="sub">店名を直す</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 1回分の記録を直す -->
+  <dialog id="visitDialog">
+    <form method="dialog" class="dlg" id="visitForm">
+      <div class="dlg-head">
+        <h3>記録を直す</h3>
+        <button class="x" value="close" aria-label="閉じる">×</button>
+      </div>
+      <label>行った日<input type="date" id="vDate" required></label>
+      <label>頼んだもの<input type="text" id="vMenu" placeholder="例：味噌チャーシュー"></label>
+      <label>★
+        <select id="vStar">
+          <option value="">なし</option>
+          <option value="1">★1</option><option value="2">★2</option><option value="3">★3</option>
+          <option value="4">★4</option><option value="5">★5</option>
+        </select>
+      </label>
+      <label>メモ<textarea id="vMemo" rows="2" placeholder="例：かなさんは塩"></textarea></label>
+      <div class="row">
+        <button value="save" class="go">保存</button>
+        <button type="button" id="vDelete" class="danger">この記録を消す</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 地図にない店を足す -->
+  <dialog id="manualDialog">
+    <form method="dialog" class="dlg">
+      <div class="dlg-head">
+        <h3>地図にない店を足す</h3>
+        <button class="x" value="close" aria-label="閉じる">×</button>
+      </div>
+      <p class="note">今いる場所を覚えておくので、次からは近くの店に出てくるよ。</p>
+      <label>店名<input type="text" id="manualName" placeholder="例：麺屋 さくら"></label>
+      <button value="save" class="go wide">足して「行った」にする</button>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" hidden><span id="toastText"></span><button id="toastUndo">取り消す</button></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

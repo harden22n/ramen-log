@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ラーメン記録 案A シンプル</title>
+<style>
+  body{margin:0;background:#fafafa;font-family:system-ui,"Hiragino Sans","Yu Gothic",sans-serif;color:#222}
+  .wrap{max-width:420px;margin:0 auto;padding:16px}
+  h1{font-size:20px;margin:8px 0 16px;letter-spacing:.05em}
+  h1 span{color:#d33}
+  .search{width:100%;box-sizing:border-box;padding:12px 14px;font-size:16px;border:1px solid #ddd;border-radius:10px;background:#fff}
+  h2{font-size:13px;color:#888;margin:20px 0 8px;font-weight:600}
+  .near{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+  .chip{flex:0 0 auto;border:1px solid #d33;color:#d33;background:#fff;border-radius:999px;padding:10px 14px;font-size:15px}
+  .chip small{color:#999;margin-left:4px}
+  .row{display:flex;justify-content:space-between;align-items:center;background:#fff;border-bottom:1px solid #eee;padding:14px 4px}
+  .name{font-size:16px;font-weight:600}
+  .sub{font-size:12px;color:#888;margin-top:2px}
+  .cnt{font-size:13px;color:#d33}
+</style></head><body><div class="wrap">
+  <h1>ラーメン<span>記録</span></h1>
+  <input class="search" placeholder="店名で探す">
+  <h2>近くの店（タップで「今日行った」）</h2>
+  <div class="near">
+    <button class="chip">麺屋 さくら<small>50m</small></button>
+    <button class="chip">らーめん 北斗<small>120m</small></button>
+    <button class="chip">味噌の大将<small>300m</small></button>
+  </div>
+  <h2>行った店</h2>
+  <div class="row"><div><div class="name">麺屋 さくら</div><div class="sub">最後 10/28・味噌チャーシュー</div></div><div class="cnt">3回</div></div>
+  <div class="row"><div><div class="name">らーめん 北斗</div><div class="sub">最後 10/12・醤油</div></div><div class="cnt">1回</div></div>
+  <div class="row"><div><div class="name">味噌の大将</div><div class="sub">最後 9/30・辛味噌</div></div><div class="cnt">2回</div></div>
+  <div class="row"><div><div class="name">中華そば 白石</div><div class="sub">最後 9/14</div></div><div class="cnt">1回</div></div>
+</div></body></html>
