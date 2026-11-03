@@ -100,8 +100,17 @@ dialog::backdrop { background: rgba(20, 20, 30, .45); }
 .dlg-head h3 { flex: 1; margin: 0; font-size: 18px; font-family: "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif JP", serif; word-break: break-all; }
 .x { background: none; border: none; font-size: 24px; line-height: 1; color: var(--usu); padding: 0 4px; }
 
-.visits { list-style: none; margin: 0; padding: 0; background: #fff; border-radius: 6px; max-height: 45vh; overflow-y: auto; }
-.visits li { padding: 10px; border-bottom: 1px solid var(--sen); display: flex; justify-content: space-between; gap: 8px; cursor: pointer; font-size: 14px; }
+.field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--usu); }
+.field .row { margin-top: 0; }
+.stars { display: flex; gap: 4px; }
+.stars button { flex: 1; background: #fff; border: 1px solid var(--waku); border-radius: 6px; font-size: 26px; line-height: 1; padding: 6px 0; color: #ddd2bf; }
+.stars button.on { color: var(--aka); border-color: var(--aka); }
+.photo { width: 100%; max-height: 26vh; object-fit: cover; border-radius: 6px; background: #fff; }
+.photo[hidden], .field [hidden] { display: none; }
+.thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 4px; flex: none; }
+.visits li .v-main { flex: 1; display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.visits {list-style: none; margin: 0; padding: 0; background: #fff; border-radius: 6px; max-height: 45vh; overflow-y: auto; }
+.visits li { padding: 10px; border-bottom: 1px solid var(--sen); display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; }
 .visits li:last-child { border-bottom: none; }
 .visits li .dist { text-align: right; }
 

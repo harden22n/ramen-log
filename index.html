@@ -80,25 +80,35 @@
     </form>
   </dialog>
 
-  <!-- 1回分の記録を直す -->
+  <!-- 1回分の記録（「行った」の直後と、あとから直すときの両方で使う） -->
   <dialog id="visitDialog">
     <form method="dialog" class="dlg" id="visitForm">
       <div class="dlg-head">
-        <h3>記録を直す</h3>
+        <h3 id="vTitle">記録を直す</h3>
         <button class="x" value="close" aria-label="閉じる">×</button>
       </div>
-      <label>行った日<input type="date" id="vDate" required></label>
-      <label>頼んだもの<input type="text" id="vMenu" placeholder="例：味噌チャーシュー"></label>
-      <label>★
-        <select id="vStar">
-          <option value="">なし</option>
-          <option value="1">★1</option><option value="2">★2</option><option value="3">★3</option>
-          <option value="4">★4</option><option value="5">★5</option>
-        </select>
-      </label>
+      <p id="vShop" class="note"></p>
+      <label>頼んだもの<input type="text" id="vMenu" placeholder="例：味噌チャーシュー" enterkeyhint="done"></label>
+      <div class="field">
+        <span>評価</span>
+        <div class="stars" id="vStars" role="radiogroup" aria-label="評価">
+          <button type="button" data-star="1" aria-label="★1">★</button><button type="button" data-star="2" aria-label="★2">★</button><button type="button" data-star="3" aria-label="★3">★</button><button type="button" data-star="4" aria-label="★4">★</button><button type="button" data-star="5" aria-label="★5">★</button>
+        </div>
+      </div>
+      <div class="field">
+        <span>写真</span>
+        <img id="vPhoto" class="photo" alt="" hidden>
+        <div class="row">
+          <button type="button" id="vPhotoBtn" class="sub">📷 写真を選ぶ</button>
+          <button type="button" id="vPhotoDel" class="sub" hidden>写真を外す</button>
+        </div>
+        <input type="file" id="vPhotoFile" accept="image/*" hidden>
+      </div>
       <label>メモ<textarea id="vMemo" rows="2" placeholder="例：かなさんは塩"></textarea></label>
+      <label>行った日<input type="date" id="vDate" required></label>
       <div class="row">
         <button value="save" class="go">保存</button>
+        <button value="later" id="vLater" class="sub" hidden>あとで</button>
         <button type="button" id="vDelete" class="danger">この記録を消す</button>
       </div>
     </form>

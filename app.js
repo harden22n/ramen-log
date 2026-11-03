@@ -287,18 +287,23 @@ function addVisit(shop) {
   if (!data.shops[shop.id]) {
     data.shops[shop.id] = { id: shop.id, name: shop.name, lat: shop.lat ?? null, lon: shop.lon ?? null, source: shop.source };
   }
-  const v = { id: uid(), shopId: shop.id, date: today(), menu: '', star: null, memo: '' };
+  const v = { id: uid(), shopId: shop.id, date: today(), menu: '', star: null, memo: '', photo: false };
   data.visits.push(v);
   save();
   render();
-  const n = visitsOf(shop.id).length;
-  toast(`${shop.name} を記録したよ（${n}回目）`, () => {
-    data.visits = data.visits.filter((x) => x.id !== v.id);
-    // 記録が1つもなくなった、地図から来た店は覚えておかなくていい
-    if (!visitsOf(shop.id).length && data.shops[shop.id]?.source === 'osm') delete data.shops[shop.id];
-    save();
-    render();
-  });
+  // 記録はもう済んでいる。続けて頼んだもの・★・写真を入れる画面を出す（「あとで」で閉じてもいい）
+  openVisit(v.id, true);
+}
+
+function removeVisit(id) {
+  const v = data.visits.find((x) => x.id === id);
+  if (!v) return;
+  data.visits = data.visits.filter((x) => x.id !== id);
+  if (v.photo) delPhoto(id).catch(() => {});
+  // 記録が1つもなくなった、地図から来た店は覚えておかなくていい
+  if (!visitsOf(v.shopId).length && data.shops[v.shopId]?.source === 'osm') delete data.shops[v.shopId];
+  save();
+  render();
 }
 
 $('nearbyTable').addEventListener('click', (e) => {
@@ -353,8 +358,16 @@ function renderShop() {
     : 'まだ記録がないよ。';
   $('visitList').innerHTML = vs.map((v) => {
     const extra = [v.menu, v.star ? `★${v.star}` : '', v.memo].filter(Boolean).map(esc).join('・');
-    return `<li data-visit="${esc(v.id)}"><span>${shortDate(v.date)}</span><span class="dist">${extra || '（タップして書き足す）'}</span></li>`;
+    return `<li data-visit="${esc(v.id)}">${v.photo ? `<img class="thumb" data-photo="${esc(v.id)}" alt="">` : ''}` +
+      `<span class="v-main"><span>${shortDate(v.date)}</span><span class="dist">${extra || '（タップして書き足す）'}</span></span></li>`;
   }).join('');
+  // 写真の小さい控えは、あとから読み込んで差し込む
+  for (const img of $('visitList').querySelectorAll('img[data-photo]')) {
+    getPhoto(img.dataset.photo).then((blob) => {
+      if (blob) img.src = URL.createObjectURL(blob);
+      else img.remove();   // 別のスマホから読み込んだ記録など、写真本体がないとき
+    }).catch(() => img.remove());
+  }
 }
 
 $('visitedTable').addEventListener('click', (e) => {
@@ -377,43 +390,155 @@ $('renameBtn').addEventListener('click', () => {
   renderShop();
 });
 
-// ---------- 1回分の記録を直す ----------
+// ---------- 写真（スマホのブラウザの中の IndexedDB に置く。localStorage では入りきらないため） ----------
+const PHOTO_MAX_PX = 1280;   // 長い辺をこの大きさまで縮める（元の写真はギャラリーに残る）
+let photoDb = null;
+
+function openPhotoDb() {
+  if (photoDb) return photoDb;
+  photoDb = new Promise((resolve, reject) => {
+    const req = indexedDB.open('ramenlog', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('photos');
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return photoDb;
+}
+
+async function photoStore(mode, fn) {
+  const db = await openPhotoDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('photos', mode);
+    const req = fn(tx.objectStore('photos'));
+    tx.oncomplete = () => resolve(req.result);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+const getPhoto = (id) => photoStore('readonly', (s) => s.get(id));
+const putPhoto = (id, blob) => photoStore('readwrite', (s) => s.put(blob, id));
+const delPhoto = (id) => photoStore('readwrite', (s) => s.delete(id));
+
+async function shrinkPhoto(file) {
+  const bmp = await createImageBitmap(file);   // スマホ写真の向き（縦横）も直してくれる
+  const k = Math.min(1, PHOTO_MAX_PX / Math.max(bmp.width, bmp.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bmp.width * k);
+  canvas.height = Math.round(bmp.height * k);
+  canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height);
+  bmp.close();
+  return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+}
+
+// ---------- 1回分の記録（頼んだもの・★・写真・メモ） ----------
 let editVisitId = null;
+let editFresh = false;      // 「行った」の直後に開いたとき true
+let editStar = null;
+let editPhoto = null;       // { blob: Blob|null } 写真を選んだ・外したときだけ入る
+
+function showStars() {
+  for (const b of $('vStars').children) b.classList.toggle('on', editStar != null && Number(b.dataset.star) <= editStar);
+}
+
+function showPhoto(blob) {
+  if ($('vPhoto').src) URL.revokeObjectURL($('vPhoto').src);
+  $('vPhoto').hidden = !blob;
+  if (blob) $('vPhoto').src = URL.createObjectURL(blob);
+  else $('vPhoto').removeAttribute('src');
+  $('vPhotoDel').hidden = !blob;
+  $('vPhotoBtn').textContent = blob ? '📷 写真を変える' : '📷 写真を選ぶ';
+}
+
+function openVisit(id, fresh) {
+  const v = data.visits.find((x) => x.id === id);
+  if (!v) return;
+  editVisitId = id;
+  editFresh = fresh;
+  editStar = v.star || null;
+  editPhoto = null;
+  const n = visitsOf(v.shopId).length;
+  $('vTitle').textContent = fresh ? '記録したよ' : '記録を直す';
+  $('vShop').textContent = fresh ? `${data.shops[v.shopId].name}（${n}回目）。頼んだもの・★・写真は今入れても、あとからでもいいよ。` : data.shops[v.shopId].name;
+  $('vDate').value = v.date;
+  $('vMenu').value = v.menu || '';
+  $('vMemo').value = v.memo || '';
+  $('vLater').hidden = !fresh;
+  $('vDelete').textContent = fresh ? '記録を取り消す' : 'この記録を消す';
+  showStars();
+  showPhoto(null);
+  if (v.photo) getPhoto(id).then((blob) => { if (editVisitId === id && !editPhoto) showPhoto(blob); }).catch(() => {});
+  $('visitDialog').returnValue = '';
+  $('visitDialog').showModal();
+}
 
 $('visitList').addEventListener('click', (e) => {
   const li = e.target.closest('li[data-visit]');
-  if (!li) return;
-  const v = data.visits.find((x) => x.id === li.dataset.visit);
-  editVisitId = v.id;
-  $('vDate').value = v.date;
-  $('vMenu').value = v.menu || '';
-  $('vStar').value = v.star ? String(v.star) : '';
-  $('vMemo').value = v.memo || '';
-  $('visitDialog').showModal();
+  if (li) openVisit(li.dataset.visit, false);
 });
 
-$('visitDialog').addEventListener('close', () => {
-  if ($('visitDialog').returnValue !== 'save') return;
+$('vStars').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-star]');
+  if (!b) return;
+  const n = Number(b.dataset.star);
+  editStar = editStar === n ? null : n;   // 同じ★をもう一度押すと消える
+  showStars();
+});
+
+$('vPhotoBtn').addEventListener('click', () => $('vPhotoFile').click());
+
+$('vPhotoFile').addEventListener('change', async () => {
+  const f = $('vPhotoFile').files[0];
+  $('vPhotoFile').value = '';
+  if (!f) return;
+  $('vPhotoBtn').textContent = '写真を読み込み中…';
+  try {
+    editPhoto = { blob: await shrinkPhoto(f) };
+    showPhoto(editPhoto.blob);
+  } catch (e) {
+    alert('この写真は読み込めなかった。別の写真で試してみて。');
+    showPhoto(null);
+  }
+});
+
+$('vPhotoDel').addEventListener('click', () => {
+  editPhoto = { blob: null };
+  showPhoto(null);
+});
+
+$('visitDialog').addEventListener('close', async () => {
+  const how = $('visitDialog').returnValue;
   $('visitDialog').returnValue = '';
   const v = data.visits.find((x) => x.id === editVisitId);
-  if (!v) return;
-  if ($('vDate').value) v.date = $('vDate').value;
-  v.menu = $('vMenu').value.trim();
-  v.star = $('vStar').value ? Number($('vStar').value) : null;
-  v.memo = $('vMemo').value.trim();
-  save();
+  if (how === 'save' && v) {
+    if ($('vDate').value) v.date = $('vDate').value;
+    v.menu = $('vMenu').value.trim();
+    v.star = editStar;
+    v.memo = $('vMemo').value.trim();
+    if (editPhoto) {
+      try {
+        if (editPhoto.blob) { await putPhoto(v.id, editPhoto.blob); v.photo = true; }
+        else { await delPhoto(v.id); v.photo = false; }
+      } catch (e) {
+        alert('写真を保存できなかった。スマホの空き容量を確かめてね。');
+      }
+    }
+    save();
+  }
+  showPhoto(null);
+  editPhoto = null;
   render();
-  renderShop();
+  if ($('shopDialog').open) renderShop();
+  if (editFresh && v) toast(`${data.shops[v.shopId].name} を記録したよ（${visitsOf(v.shopId).length}回目）`);
 });
 
 $('vDelete').addEventListener('click', () => {
   const v = data.visits.find((x) => x.id === editVisitId);
-  if (!v || !confirm(`${shortDate(v.date)} の記録を消す？`)) return;
-  data.visits = data.visits.filter((x) => x.id !== v.id);
-  save();
+  if (!v) return;
+  if (!editFresh && !confirm(`${shortDate(v.date)} の記録を消す？`)) return;
+  removeVisit(v.id);
+  editFresh = false;
   $('visitDialog').close();
-  render();
-  renderShop();
+  toast('記録を取り消したよ');
 });
 
 // ---------- 検索 ----------
@@ -439,7 +564,7 @@ const OBSIDIAN_FILE = 'プロジェクト/ラーメン記録/拉麺帖バック�
 function backupNote() {
   const cell = (s) => String(s ?? '').replace(/\|/g, '｜').replace(/\s*\n\s*/g, ' ');
   const rows = [...data.visits].sort((a, b) => b.date.localeCompare(a.date)).map((v) =>
-    `| ${v.date} | ${cell(data.shops[v.shopId]?.name)} | ${cell(v.menu)} | ${v.star ? '★' + v.star : ''} | ${cell(v.memo)} |`);
+    `| ${v.date} | ${cell(data.shops[v.shopId]?.name)} | ${cell(v.menu)} | ${v.star ? '★' + v.star : ''} | ${v.photo ? '📷' : ''} | ${cell(v.memo)} |`);
   return [
     '---',
     '種類: バックアップ',
@@ -452,11 +577,12 @@ function backupNote() {
     '',
     '拉麺帖の「Obsidianに保存」で毎回上書きされるノート。手で直さない（直してもアプリには戻らない）。',
     'アプリに戻すときは、拉麺帖の「読み込む」でこのノートを選ぶ。',
+    '写真（📷）はこのノートには入らない。元の写真はスマホのギャラリーにある。',
     '',
     '## 記録（新しい順）',
     '',
-    '| 行った日 | 店 | 頼んだもの | ★ | メモ |',
-    '| --- | --- | --- | --- | --- |',
+    '| 行った日 | 店 | 頼んだもの | ★ | 写真 | メモ |',
+    '| --- | --- | --- | --- | --- | --- |',
     ...rows,
     '',
     '## データ（読み込み用）',
