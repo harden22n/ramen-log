@@ -65,7 +65,11 @@ tr.tap:active { background: #faf5ec; }
 .dist { color: #9a8a7a; font-size: 11px; }
 .num { text-align: right; color: var(--aka); font-weight: 700; white-space: nowrap; }
 .note { font-size: 12px; color: var(--usu); margin: 6px 0; line-height: 1.6; }
-.credit { font-size: 10px; color: #9a8a7a; text-align: center; margin-top: 28px; }
+.install { background: #fff; border: 1px solid var(--ai); border-radius: 6px; padding: 10px 12px; margin-bottom: 14px; }
+.install p { margin: 0; font-size: 13px; line-height: 1.6; }
+.install[hidden], .install [hidden] { display: none; }
+a.btn { text-decoration: none; text-align: center; flex: 1; }
+.credit {font-size: 10px; color: #9a8a7a; text-align: center; margin-top: 28px; }
 .credit a { color: inherit; }
 mark {background: #fbe3b5; color: inherit; }
 

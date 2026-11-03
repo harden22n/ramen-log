@@ -18,6 +18,16 @@
   </header>
 
   <main class="wrap">
+    <!-- ホーム画面に置くための案内（ホーム画面から開いたときは出さない） -->
+    <div id="installCard" class="install" hidden>
+      <p id="installText"></p>
+      <div class="row">
+        <button id="installBtn" class="go" hidden>ホーム画面に置く</button>
+        <a id="openChrome" class="go btn" hidden>Chromeで開く</a>
+        <button id="installClose" class="sub">あとで</button>
+      </div>
+    </div>
+
     <div class="stats">
       <div class="s"><b id="statYear">0</b>今年の杯数</div>
       <div class="s"><b id="statShops">0</b>行った店</div>

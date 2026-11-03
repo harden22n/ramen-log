@@ -6,6 +6,7 @@ const STORE_KEY = 'ramenlog.v1';
 const NEAR_RADIUS = 2000;          // この半径(m)の中から近い順に出す
 const NEAR_MAX = 5;                // 近くの店の表示件数
 const MANUAL_SAME_PLACE_M = 40;    // 手で足した店と地図の店が同じとみなす距離
+const SAME_SHOP_M = 80;            // 同じ名前の店がこの距離内にあれば、だぶりとみなす（チェーン店の別店舗は残る）
 // 札幌市内のラーメン店は data/sapporo-ramen.json に入れてある（すぐ出せて、電波が弱くても動く）。
 // その外にいるときだけ、OpenStreetMap の検索サーバー（Overpass）に聞く。混んでいることが多いので同時に聞いて早い方を使う
 const OVERPASS_URLS = [
@@ -242,6 +243,11 @@ async function findNearby() {
     // 手で足した店と、同じ名前で同じ場所にある地図の店がだぶったら片方だけ出す
     list = list.filter((s) => !(s.source === 'osm' && !data.shops[s.id] &&
       list.some((m) => m.source === 'manual' && norm(m.name) === norm(s.name) && distance(m.lat, m.lon, s.lat, s.lon) < MANUAL_SAME_PLACE_M)));
+    list.sort((a, b) => a.dist - b.dist);
+    // 地図に同じ店が2回載っていることがある（点と建物の形など）。同じ名前で近いものは近い方だけ残す。記録のある方を優先
+    list.sort((a, b) => (data.shops[b.id] ? 1 : 0) - (data.shops[a.id] ? 1 : 0) || a.dist - b.dist);
+    list = list.filter((s, i) => !list.slice(0, i).some((m) => norm(m.name) === norm(s.name) &&
+      distance(m.lat, m.lon, s.lat, s.lon) < SAME_SHOP_M));
     list.sort((a, b) => a.dist - b.dist);
     lastNearby = { lat: pos.lat, lon: pos.lon, shops: list.slice(0, NEAR_MAX) };
     renderNearby(lastNearby);
@@ -489,8 +495,58 @@ $('toastUndo').addEventListener('click', () => {
   if ($('shopDialog').open) renderShop();
 });
 
+// ---------- ホーム画面に置く ----------
+// LINE・Gmail・Claude などのアプリの中で開くと、インストールが出てこない（記録もそのアプリの中に別に保存される）。
+// Chrome で開いていてインストールできるときは「ホーム画面に置く」ボタン、そうでなければ Chrome で開く案内を出す
+const INSTALL_HIDE_KEY = 'ramenlog.installHiddenAt';
+const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+let installEvent = null;
+
+function showInstallCard() {
+  const hiddenAt = Number(localStorage.getItem(INSTALL_HIDE_KEY) || 0);
+  if (standalone || Date.now() - hiddenAt < 7 * 86400000) return;
+  const ua = navigator.userAgent;
+  // アプリの中のブラウザ（WebView・LINE・Instagram など）と分かるとき
+  const inApp = /Android/i.test(ua) && /; wv\)|Line\/|FBAN|FBAV|Instagram/i.test(ua);
+  if (installEvent) {
+    $('installText').textContent = 'ホーム画面に置くと、アプリみたいにすぐ開けるよ。';
+    $('installBtn').hidden = false;
+    $('openChrome').hidden = true;
+  } else if (inApp) {
+    $('installText').textContent = 'いまは別のアプリの中で開いてるみたい。ここだと記録が別々になるし、ホーム画面にも置けないので、Chrome で開いてね。';
+    $('openChrome').href = `intent://${location.host}${location.pathname}#Intent;scheme=https;package=com.android.chrome;end`;
+    $('openChrome').hidden = false;
+  } else {
+    return;   // インストール済み、または判断できないときは何も出さない
+  }
+  $('installCard').hidden = false;
+}
+
+addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  installEvent = e;
+  showInstallCard();
+});
+
+$('installBtn').addEventListener('click', async () => {
+  if (!installEvent) return;
+  installEvent.prompt();
+  const { outcome } = await installEvent.userChoice;
+  installEvent = null;
+  if (outcome === 'accepted') $('installCard').hidden = true;
+});
+
+$('installClose').addEventListener('click', () => {
+  localStorage.setItem(INSTALL_HIDE_KEY, String(Date.now()));
+  $('installCard').hidden = true;
+});
+
+addEventListener('appinstalled', () => { $('installCard').hidden = true; });
+
 // ---------- はじめ ----------
 $('findNearby').addEventListener('click', findNearby);
 render();
+// インストールできるかの知らせ（beforeinstallprompt）は少し遅れて来るので、待ってから案内を出す
+setTimeout(showInstallCard, 2500);
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
