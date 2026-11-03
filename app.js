@@ -420,9 +420,65 @@ $('vDelete').addEventListener('click', () => {
 $('search').addEventListener('input', renderVisited);
 
 // ---------- バックアップ ----------
+function backupData() {
+  return { app: 'ramen-log', version: 1, exportedAt: new Date().toISOString(), shops: data.shops, visits: data.visits };
+}
+
+function markBackedUp(text) {
+  data.lastBackup = new Date().toISOString();
+  save();
+  renderBackupNote();
+  toast(text);
+}
+
+// Obsidian の保管庫にノートとして保存する（Syncthing でPCにも届く）。
+// obsidian:// のリンクで Obsidian を開き、決まった場所のノートを上書きする。古い版は Syncthing の .stversions に残る
+const OBSIDIAN_VAULT = '保管庫';
+const OBSIDIAN_FILE = 'プロジェクト/ラーメン記録/拉麺帖バックアップ';
+
+function backupNote() {
+  const cell = (s) => String(s ?? '').replace(/\|/g, '｜').replace(/\s*\n\s*/g, ' ');
+  const rows = [...data.visits].sort((a, b) => b.date.localeCompare(a.date)).map((v) =>
+    `| ${v.date} | ${cell(data.shops[v.shopId]?.name)} | ${cell(v.menu)} | ${v.star ? '★' + v.star : ''} | ${cell(v.memo)} |`);
+  return [
+    '---',
+    '種類: バックアップ',
+    'アプリ: 拉麺帖',
+    `書き出し日: ${today()}`,
+    `杯数: ${data.visits.length}`,
+    '---',
+    '',
+    '# 拉麺帖バックアップ',
+    '',
+    '拉麺帖の「Obsidianに保存」で毎回上書きされるノート。手で直さない（直してもアプリには戻らない）。',
+    'アプリに戻すときは、拉麺帖の「読み込む」でこのノートを選ぶ。',
+    '',
+    '## 記録（新しい順）',
+    '',
+    '| 行った日 | 店 | 頼んだもの | ★ | メモ |',
+    '| --- | --- | --- | --- | --- |',
+    ...rows,
+    '',
+    '## データ（読み込み用）',
+    '',
+    '```json',
+    JSON.stringify(backupData()),
+    '```',
+    '',
+  ].join('\n');
+}
+
+$('obsidianBtn').addEventListener('click', () => {
+  const params = new URLSearchParams({ vault: OBSIDIAN_VAULT, file: OBSIDIAN_FILE, content: backupNote(), overwrite: 'true' });
+  const a = document.createElement('a');
+  // URLSearchParams は空白を + にするが、Obsidian は %20 でないと読めないので直す
+  a.href = 'obsidian://new?' + params.toString().replace(/\+/g, '%20');
+  a.click();
+  markBackedUp('Obsidian に保存したよ（プロジェクト/ラーメン記録/拉麺帖バックアップ）');
+});
+
 $('exportBtn').addEventListener('click', async () => {
-  const body = JSON.stringify({ app: 'ramen-log', version: 1, exportedAt: new Date().toISOString(),
-    shops: data.shops, visits: data.visits }, null, 2);
+  const body = JSON.stringify(backupData(), null, 2);
   const name = `ramen-log-${today()}.json`;
   const file = new File([body], name, { type: 'application/json' });
   // スマホなら「共有」でGoogleドライブやLINEのKeepなどに送れる。できなければダウンロード
@@ -440,10 +496,7 @@ $('exportBtn').addEventListener('click', async () => {
     a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);
   }
-  data.lastBackup = new Date().toISOString();
-  save();
-  renderBackupNote();
-  toast(shared ? '書き出したよ' : `${name} を保存したよ（ダウンロードフォルダ）`);
+  markBackedUp(shared ? '書き出したよ' : `${name} を保存したよ（ダウンロードフォルダ）`);
 });
 
 $('importBtn').addEventListener('click', () => $('importFile').click());
@@ -454,7 +507,11 @@ $('importFile').addEventListener('change', async () => {
   if (!f) return;
   let d;
   try {
-    d = JSON.parse(await f.text());
+    let text = await f.text();
+    // Obsidian のノート（.md）なら、```json の中身を取り出す
+    const block = text.match(/```json\s*([\s\S]*?)```/);
+    if (block) text = block[1];
+    d = JSON.parse(text);
     if (!d || typeof d.shops !== 'object' || !Array.isArray(d.visits)) throw new Error();
   } catch (e) {
     alert('このファイルは拉麺帖のバックアップじゃないみたい。');
