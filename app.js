@@ -470,10 +470,12 @@ function backupNote() {
 
 $('obsidianBtn').addEventListener('click', () => {
   const params = new URLSearchParams({ vault: OBSIDIAN_VAULT, file: OBSIDIAN_FILE, content: backupNote(), overwrite: 'true' });
-  const a = document.createElement('a');
   // URLSearchParams は空白を + にするが、Obsidian は %20 でないと読めないので直す
-  a.href = 'obsidian://new?' + params.toString().replace(/\+/g, '%20');
-  a.click();
+  const query = params.toString().replace(/\+/g, '%20');
+  // Android の Chrome は obsidian:// をそのまま開かないことがあるので、intent:// で Obsidian アプリ（md.obsidian）を直接指名する
+  location.href = /Android/i.test(navigator.userAgent)
+    ? `intent://new?${query}#Intent;scheme=obsidian;package=md.obsidian;end`
+    : `obsidian://new?${query}`;
   markBackedUp('Obsidian に保存したよ（プロジェクト/ラーメン記録/拉麺帖バックアップ）');
 });
 
