@@ -354,9 +354,23 @@ const PLACES_KEY = 'ramenlog.placesKey';
 const placesKey = () => { try { return localStorage.getItem(PLACES_KEY) || ''; } catch (e) { return ''; } };
 
 // 店名などで Google に聞いて、見つかった店（最大 n 件）を返す。近くの店を優先する
+// 使いすぎの歯止め：このスマホから Google に聞くのは1日 PLACES_DAILY_MAX 回まで（無料の範囲を超えないように）
+const PLACES_DAILY_MAX = 50;
+const PLACES_COUNT_KEY = 'ramenlog.placesCount';
+
+function countPlaces() {
+  let c = {};
+  try { c = JSON.parse(localStorage.getItem(PLACES_COUNT_KEY)) || {}; } catch (e) { /* 空から */ }
+  if (c.date !== today()) c = { date: today(), n: 0 };
+  if (c.n >= PLACES_DAILY_MAX) throw new Error(`今日はもう${PLACES_DAILY_MAX}回使ったので、また明日使えるよ`);
+  c.n++;
+  try { localStorage.setItem(PLACES_COUNT_KEY, JSON.stringify(c)); } catch (e) { /* 数えられなくても止めない */ }
+}
+
 async function placesSearch(query, n = 1) {
   const key = placesKey();
   if (!key) return [];
+  countPlaces();
   const near = lastPos || (() => {
     const s = myVisits().map((v) => data.shops[v.shopId]).find((x) => x && x.lat != null);
     return s ? { lat: s.lat, lon: s.lon } : { lat: SAPPORO[0], lon: SAPPORO[1] };
