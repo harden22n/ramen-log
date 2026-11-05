@@ -1165,6 +1165,20 @@ $('placesClear').addEventListener('click', () => {
 });
 renderPlacesKey();
 
+// ---------- たためる欄：開いているかどうかを覚えておく（はじめはたたんである） ----------
+const FOLD_KEY = 'ramenlog.folds';
+{
+  let open = {};
+  try { open = JSON.parse(localStorage.getItem(FOLD_KEY)) || {}; } catch (e) { /* はじめは全部たたむ */ }
+  for (const d of document.querySelectorAll('details[data-fold]')) {
+    if (open[d.dataset.fold]) d.open = true;
+    d.addEventListener('toggle', () => {
+      open[d.dataset.fold] = d.open;
+      try { localStorage.setItem(FOLD_KEY, JSON.stringify(open)); } catch (e) { /* 覚えられなくてもいい */ }
+    });
+  }
+}
+
 // ---------- バックアップ ----------
 function backupData() {
   return { app: 'ramen-log', version: 1, exportedAt: new Date().toISOString(), shops: data.shops, visits: data.visits };

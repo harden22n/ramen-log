@@ -21,6 +21,7 @@ const enc = (id) => id.replace(/\//g, '~');   // 店の id の「/」は Firesto
 const joinParam = new URLSearchParams(location.search).get('join');
 if (joinParam) {
   $('joinCode').value = joinParam;
+  $('shareSection').open = true;   // 合言葉のリンクから来たときは共有の欄を開いておく
   history.replaceState(null, '', location.pathname);
 }
 

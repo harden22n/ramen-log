@@ -79,8 +79,8 @@
       <p id="mapNote" class="note"></p>
     </section>
 
-    <section id="shareSection">
-      <h2>みんなで共有</h2>
+    <details id="shareSection" class="fold" data-fold="share">
+      <summary>みんなで共有</summary>
       <p id="shareNote" class="note">共有の準備をしてるよ…</p>
       <div id="shareOut" hidden>
         <button id="loginBtn" class="wide">Googleでログイン</button>
@@ -99,20 +99,20 @@
         <button id="leaveGroup" class="sub">グループを抜ける</button>
       </div>
       <button id="logoutBtn" class="link" hidden>ログアウト</button>
-    </section>
+    </details>
 
-    <section>
-      <h2>Googleの店検索</h2>
+    <details class="fold" data-fold="places">
+      <summary>Googleの店検索</summary>
       <p id="placesNote" class="note"></p>
       <div class="row">
         <input id="placesKeyInput" class="search" type="password" placeholder="APIキー" autocomplete="off" autocapitalize="off" spellcheck="false">
         <button id="placesSave" class="go">保存</button>
       </div>
       <button id="placesClear" class="link" hidden>キーを消す</button>
-    </section>
+    </details>
 
-    <section>
-      <h2>バックアップ</h2>
+    <details class="fold" data-fold="backup">
+      <summary>バックアップ</summary>
       <p id="backupNote" class="note"></p>
       <button id="obsidianBtn" class="wide">Obsidianに保存</button>
       <div class="row">
@@ -120,7 +120,7 @@
         <button id="importBtn" class="sub">読み込む</button>
         <input id="importFile" type="file" accept="application/json,.json,text/markdown,.md,text/plain" hidden>
       </div>
-    </section>
+    </details>
 
     <p class="credit">店と地図のデータ © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors</p>
   </main>
