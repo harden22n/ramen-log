@@ -149,10 +149,11 @@ function renderVisited() {
   if (q) rows = rows.filter((s) => norm(s.name).includes(q));
   rows.sort((a, b) => counts[b.id] - counts[a.id] || visitsOf(b.id)[0].date.localeCompare(visitsOf(a.id)[0].date));
 
-  $('listTitle').textContent = q ? `「${$('search').value.trim()}」で探した結果（${rows.length}件）` : '行った店（回数順）';
+  $('listTitle').textContent = q ? `「${$('search').value.trim()}」行った店（${rows.length}件）` : '行った店（回数順）';
   $('nearbySection').hidden = !!q;   // 探している間は近くの店をしまって、結果を上に出す
   $('emptyNote').hidden = rows.length > 0;
-  $('emptyNote').textContent = q ? 'その名前の店はまだ記録にないよ。' : 'まだ記録がないよ。お店で「今いる場所から店を探す」を押してね。';
+  $('emptyNote').textContent = q ? 'この名前の店には、まだ行ってないよ。' : 'まだ記録がないよ。お店で「今いる場所から店を探す」を押してね。';
+  renderMore(q, new Set(rows.map((s) => s.id)));
 
   $('visitedTable').tBodies[0].innerHTML = rows.map((s) => {
     const last = visitsOf(s.id)[0];
@@ -162,6 +163,56 @@ function renderVisited() {
       <td class="num">${counts[s.id]}回</td></tr>`;
   }).join('');
 }
+
+// 探しているとき：行ってない店も、地図の店リスト（札幌＋前に調べた場所）と手で足した店から出す
+const MORE_MAX = 20;
+let moreShops = [];
+async function renderMore(q, shownIds) {
+  if (!q) { $('moreBox').hidden = true; moreShops = []; return; }
+  const b = await loadBundled().catch(() => null);
+  if (norm($('search').value) !== q) return;   // 待っている間に検索語が変わった
+  const pool = [...Object.values(data.shops), ...(b ? b.shops : [])];
+  try {
+    for (const c of Object.values(JSON.parse(localStorage.getItem(LIVE_CACHE_KEY)) || {})) pool.push(...c.shops);
+  } catch (e) { /* なくてもいい */ }
+  const visited = Object.values(data.shops).filter((s) => data.visits.some((v) => v.shopId === s.id));
+  const base = lastPos;
+  let list = [];
+  const seen = new Set();
+  for (const s of pool) {
+    if (seen.has(s.id) || shownIds.has(s.id) || s.lat == null || !norm(s.name).includes(q)) continue;
+    seen.add(s.id);
+    if (data.visits.some((v) => v.shopId === s.id)) continue;
+    // 行った店と同じ店（地図に2回載っているものなど）は出さない
+    if (visited.some((m) => norm(m.name) === norm(s.name) && m.lat != null && distance(m.lat, m.lon, s.lat, s.lon) < SAME_SHOP_M)) continue;
+    if (list.some((m) => norm(m.name) === norm(s.name) && distance(m.lat, m.lon, s.lat, s.lon) < SAME_SHOP_M)) continue;
+    list.push({ ...s, dist: base ? distance(base.lat, base.lon, s.lat, s.lon) : null });
+  }
+  list.sort((a, c) => (base ? a.dist - c.dist : a.name.localeCompare(c.name, 'ja')));
+  const total = list.length;
+  moreShops = list.slice(0, MORE_MAX);
+  $('moreBox').hidden = false;
+  $('moreTitle').textContent = `「${$('search').value.trim()}」行ってない店（${total}件）`;
+  $('moreTable').hidden = !total;
+  $('moreTable').tBodies[0].innerHTML = moreShops.map((s, i) => `<tr>
+    <td>${highlight(s.name, q)}${s.dist != null ? `<br><span class="dist">今いる場所から${fmtDist(s.dist)}</span>` : ''}</td>
+    <td class="r"><button class="sub" data-more-map="${i}">地図</button> <button class="go" data-more-go="${i}">行った</button></td></tr>`).join('');
+  $('moreNote').hidden = false;
+  $('moreNote').textContent = !total
+    ? (b ? '地図の店リストにも見つからなかった。お店にいるなら「地図にない店を足す」で入れてね。' : '店リストを読み込めなかった。')
+    : (total > MORE_MAX ? `多いので${MORE_MAX}件だけ出してるよ。もう少し詳しく入れてね。` : '') +
+      (b ? '札幌市内と、前に「店を探す」をした場所の店から探してるよ。' : '');
+}
+
+$('moreTable').addEventListener('click', (e) => {
+  const m = e.target.closest('button[data-more-map]');
+  const g = e.target.closest('button[data-more-go]');
+  const s = moreShops[Number((m || g)?.dataset.moreMap ?? (m || g)?.dataset.moreGo)];
+  if (!s) return;
+  if (m) { showOnMap(s, 'まだ行ってない店'); return; }
+  const { dist, ...shop } = s;
+  addVisit(shop);
+});
 
 // 検索語に当たった部分に色をつける（表記ゆれをそろえた上で位置を探す）
 function highlight(name, q) {
@@ -369,13 +420,13 @@ $('recTable').addEventListener('click', (e) => {
 });
 
 let recMarker = null;
-function showOnMap(shop) {
+function showOnMap(shop, label = 'おすすめ（まだ行ってない店）') {
   if (!map) return;
   if (recMarker) recMarker.remove();
   const icon = L.divIcon({ className: '', html: '<div class="pin rec" style="width:28px;height:28px">☆</div>',
     iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -14] });
   recMarker = L.marker([shop.lat, shop.lon], { icon, zIndexOffset: 1000 }).addTo(map)
-    .bindPopup(`<div class="pop"><b>${esc(shop.name)}</b><span class="dist">おすすめ（まだ行ってない店）</span>` +
+    .bindPopup(`<div class="pop"><b>${esc(shop.name)}</b><span class="dist">${esc(label)}</span>` +
       `<a class="sub btn" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${shop.lat},${shop.lon}">Googleマップで見る</a></div>`);
   $('mapSection').scrollIntoView({ block: 'center' });
   map.setView([shop.lat, shop.lon], 16, { animate: false });
