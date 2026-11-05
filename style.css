@@ -136,3 +136,9 @@ dialog::backdrop { background: rgba(20, 20, 30, .45); }
 .pop b { font-size: 14px; }
 .pop .dist { display: block; margin: 2px 0 6px; }
 .pop button { font-size: 13px; padding: 6px 10px; }
+
+/* おすすめ */
+.tag { font-size: 11px; padding: 2px 6px; border-radius: 3px; border: 1px solid var(--ai); color: var(--ai); white-space: nowrap; }
+.tag.again { border-color: var(--aka); color: var(--aka); }
+.pin.rec { background: #d4a017; font-size: 14px; }
+.pop a.btn { display: inline-block; font-size: 13px; padding: 6px 10px; text-decoration: none; }

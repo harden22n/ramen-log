@@ -87,6 +87,7 @@ function render() {
   renderVisited();
   renderBackupNote();
   renderMap();
+  renderRecommend();
   if (lastNearby) renderNearby(lastNearby);
 }
 
@@ -211,6 +212,133 @@ function showHere(pos) {
     .bindTooltip('今いる場所').addTo(map);
 }
 
+// ---------- おすすめ ----------
+// 地図のデータには店名と場所しかないので、好みは「店名と頼んだもの」に出てくる言葉から推し量る。
+// 言葉はひらがな・小文字にそろえてから当てる（norm と同じ形で書く）
+const TASTES = [
+  ['味噌', /味噌|みそ|miso/], ['塩', /塩|しお/], ['醤油', /醤油|しょうゆ|しょう油|正油/],
+  ['豚骨', /豚骨|とんこつ/], ['鶏', /鶏|地どり|とりぱいたん/], ['煮干し', /煮干|にぼし|にぼ/],
+  ['魚介', /魚介|ぎょかい/], ['つけ麺', /つけ麺|つけめん|付け麺/], ['家系', /家系|いえけい/],
+  ['二郎系', /二郎|じろう|じろー|豚山/], ['担々麺', /担々|坦々|担担|たんたん/], ['辛い', /辛|からい/],
+  ['中華そば', /中華そば|支那そば|しなそば/], ['白湯', /白湯|ぱいたん/], ['油そば', /油そば|まぜそば|あぶらそば/],
+];
+const REC_MAX = 3;            // 好みのおすすめの件数
+const REC_RANGE_M = 10000;    // 基準の場所からこの距離までの店から選ぶ
+const AGAIN_STAR = 4;         // この★以上の店を「また行こう」に出す
+const AGAIN_DAYS = 30;        // 最後に行ってからこの日数がたったら出す
+let recShops = [];            // いま出しているおすすめ（タップしたとき用）
+
+function tastesOf(text) {
+  const t = norm(text);
+  return TASTES.filter(([, re]) => re.test(t)).map(([name]) => name);
+}
+
+// 好みの点数：★5なら+3、★4は+2、★3は+1、★なしは+1、★2は0、★1は-1
+function tasteScores() {
+  const score = {};
+  for (const v of data.visits) {
+    const shop = data.shops[v.shopId];
+    if (!shop) continue;
+    const w = v.star ? v.star - 2 : 1;
+    for (const t of new Set(tastesOf(`${shop.name} ${v.menu || ''}`))) score[t] = (score[t] || 0) + w;
+  }
+  return score;
+}
+
+function daysSince(iso) {
+  return Math.round((new Date(today()) - new Date(iso)) / 86400000);
+}
+
+async function renderRecommend() {
+  if (!data.visits.length) { recShops = []; $('recSection').hidden = true; return; }
+  const rows = [];
+
+  // ① ★が高いのに、しばらく行っていない店
+  const again = [];
+  for (const id of new Set(data.visits.map((v) => v.shopId))) {
+    const vs = visitsOf(id), stars = vs.map((v) => v.star).filter(Boolean);
+    if (!stars.length || !data.shops[id]) continue;
+    const avg = stars.reduce((a, b) => a + b, 0) / stars.length;
+    const days = daysSince(vs[0].date);
+    if (avg >= AGAIN_STAR && days >= AGAIN_DAYS) again.push({ shop: data.shops[id], avg, days });
+  }
+  again.sort((a, b) => b.avg - a.avg || b.days - a.days);
+  for (const a of again.slice(0, 2)) {
+    rows.push({ shop: a.shop, visited: true, tag: 'また行こう',
+      why: `★${Number.isInteger(a.avg) ? a.avg : a.avg.toFixed(1)}・${a.days}日行ってない` });
+  }
+
+  // ② 好みに近くて、まだ行っていない店
+  const score = tasteScores();
+  const liked = Object.entries(score).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+  let note = '';
+  if (!liked.length) {
+    note = '★や頼んだもの（味噌・塩・つけ麺など）を入れていくと、好みに近い行ったことのない店も出すよ。';
+  } else {
+    // 基準の場所：さっき調べた今いる場所。なければ最後に行った店
+    const lastShop = data.visits.map((v) => data.shops[v.shopId]).filter((s) => s && s.lat != null)
+      .sort((a, b) => visitsOf(b.id)[0].date.localeCompare(visitsOf(a.id)[0].date))[0];
+    const base = lastPos ? { lat: lastPos.lat, lon: lastPos.lon, label: '今いる場所' }
+      : lastShop ? { lat: lastShop.lat, lon: lastShop.lon, label: lastShop.name } : null;
+    const b = await loadBundled().catch(() => null);
+    const pool = b ? [...b.shops] : [];
+    try {   // 札幌の外で前に調べた店も候補に入れる
+      for (const c of Object.values(JSON.parse(localStorage.getItem(LIVE_CACHE_KEY)) || {})) pool.push(...c.shops);
+    } catch (e) { /* なくてもいい */ }
+    const visitedNames = new Set(Object.keys(data.shops).filter((id) => visitsOf(id).length).map((id) => norm(data.shops[id].name)));
+    const best = new Map();
+    for (const s of pool) {
+      if (visitedNames.has(norm(s.name))) continue;   // 同じ名前の店（チェーンの別店舗も）にはもう行っている
+      const ts = tastesOf(s.name).filter((t) => score[t] > 0);
+      if (!ts.length) continue;
+      const dist = base ? distance(base.lat, base.lon, s.lat, s.lon) : 0;
+      if (base && dist > REC_RANGE_M) continue;
+      const pts = ts.reduce((n, t) => n + score[t], 0);
+      const prev = best.get(norm(s.name));
+      if (!prev || dist < prev.dist) best.set(norm(s.name), { shop: s, ts, pts, dist });
+    }
+    // 好みの点数の高い順。2km 離れるごとに1点ずつ下げて、近い店を少し上にする
+    const cands = [...best.values()].sort((a, b) => (b.pts - b.dist / 2000) - (a.pts - a.dist / 2000));
+    for (const c of cands.slice(0, REC_MAX)) {
+      rows.push({ shop: c.shop, visited: false, tag: '未訪問',
+        why: `${c.ts.join('・')}が好きそうなので${base ? `・${base.label}から${fmtDist(c.dist)}` : ''}` });
+    }
+    if (!cands.length) note = `好み（${liked.slice(0, 3).map(([t]) => t).join('・')}）に合う、行ったことのない店が近くに見つからなかった。`;
+  }
+
+  recShops = rows;
+  $('recSection').hidden = !!norm($('search').value) || (!rows.length && !note);
+  $('recTable').hidden = !rows.length;
+  $('recTable').tBodies[0].innerHTML = rows.map((r, i) => `<tr class="tap" data-rec="${i}">
+    <td>${esc(r.shop.name)}<br><span class="dist">${esc(r.why)}</span></td>
+    <td class="r"><span class="tag${r.visited ? ' again' : ''}">${r.tag}</span></td></tr>`).join('');
+  $('recNote').hidden = !note;
+  $('recNote').textContent = note;
+}
+
+// 行ったことのある店は記録を開く。まだの店は地図に出す
+$('recTable').addEventListener('click', (e) => {
+  const tr = e.target.closest('tr[data-rec]');
+  const r = tr && recShops[Number(tr.dataset.rec)];
+  if (!r) return;
+  if (r.visited) openShop(r.shop.id);
+  else showOnMap(r.shop);
+});
+
+let recMarker = null;
+function showOnMap(shop) {
+  if (!map) return;
+  if (recMarker) recMarker.remove();
+  const icon = L.divIcon({ className: '', html: '<div class="pin rec" style="width:28px;height:28px">☆</div>',
+    iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -14] });
+  recMarker = L.marker([shop.lat, shop.lon], { icon, zIndexOffset: 1000 }).addTo(map)
+    .bindPopup(`<div class="pop"><b>${esc(shop.name)}</b><span class="dist">おすすめ（まだ行ってない店）</span>` +
+      `<a class="sub btn" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${shop.lat},${shop.lon}">Googleマップで見る</a></div>`);
+  $('mapSection').scrollIntoView({ block: 'center' });
+  map.setView([shop.lat, shop.lon], 16, { animate: false });
+  recMarker.openPopup();
+}
+
 // ---------- 近くの店 ----------
 let lastNearby = null;   // {lat, lon, shops:[{...shop, dist}]}
 let lastPos = null;
@@ -316,6 +444,7 @@ async function findNearby() {
     list.sort((a, b) => a.dist - b.dist);
     lastNearby = { lat: pos.lat, lon: pos.lon, shops: list.slice(0, NEAR_MAX) };
     renderNearby(lastNearby);
+    renderRecommend();   // 今いる場所が分かったので、おすすめも近い店から選び直す
     const accTxt = pos.acc > 100 ? `位置のずれが大きめ（約${Math.round(pos.acc)}m）なので、違う店が出てたら少し待ってもう一度押してね。` : '';
     if (!usedOsm) status('地図が混んでてつながらなかったので、前に記録した店だけ出してるよ。ない店は下の「地図にない店を足す」で入れてね。' + accTxt);
     else if (!list.length) status('近くにラーメン屋が見つからなかった。下の「地図にない店を足す」で店名を入れてね。');
@@ -607,7 +736,11 @@ $('vDelete').addEventListener('click', () => {
 });
 
 // ---------- 検索 ----------
-$('search').addEventListener('input', () => { renderVisited(); renderMap(); });
+$('search').addEventListener('input', () => {
+  renderVisited();
+  renderMap();
+  $('recSection').hidden = !!norm($('search').value) || (!recShops.length && $('recNote').hidden);
+});
 
 // ---------- バックアップ ----------
 function backupData() {
