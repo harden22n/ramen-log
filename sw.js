@@ -1,7 +1,7 @@
 // オフラインでも画面が開けるように、アプリのファイルをスマホに置いておく係（サービスワーカー）
 // ファイルを直したら CACHE の番号を上げる（上げないと古い画面のままになる）
-const CACHE = 'ramenlog-v8';
-const FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest', 'data/sapporo-ramen.json', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png'];
+const CACHE = 'ramenlog-v9';
+const FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest', 'data/sapporo-ramen.json', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'vendor/leaflet/leaflet.js', 'vendor/leaflet/leaflet.css'];
 
 self.addEventListener('install', (e) => {
   // cache: 'reload' で、使い回しの古いファイルではなく必ずサーバーから取り直す

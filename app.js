@@ -86,6 +86,7 @@ function render() {
   renderStats();
   renderVisited();
   renderBackupNote();
+  renderMap();
   if (lastNearby) renderNearby(lastNearby);
 }
 
@@ -145,6 +146,69 @@ function renderBackupNote() {
   const days = Math.floor((Date.now() - new Date(data.lastBackup).getTime()) / 86400000);
   $('backupNote').textContent = `記録${n}件。最後に書き出したのは${days === 0 ? '今日' : days + '日前'}。` +
     (days >= 30 ? 'そろそろまた書き出しておこう。' : '');
+}
+
+// ---------- 地図（行った店にピンを立てる） ----------
+// 地図の絵（タイル）は OpenStreetMap から借りる。ネットがないときは地図の絵だけ出ない
+const SAPPORO = [43.062, 141.354];
+let map = null, pinLayer = null, hereLayer = null, mapKey = '';
+
+function renderMap() {
+  if (!window.L) { $('mapNote').textContent = '地図を読み込めなかった。電波のいいところで開き直してね。'; return; }
+  if (!map) {
+    map = L.map('map', { zoomControl: true, attributionControl: true }).setView(SAPPORO, 12);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(map);
+    pinLayer = L.layerGroup().addTo(map);
+    map.on('popupopen', (e) => {
+      const b = e.popup.getElement().querySelector('button[data-shop]');
+      if (b) b.addEventListener('click', () => { map.closePopup(); openShop(b.dataset.shop); });
+    });
+  }
+  const q = norm($('search').value);
+  const counts = {};
+  for (const v of data.visits) counts[v.shopId] = (counts[v.shopId] || 0) + 1;
+  let shops = Object.keys(counts).map((id) => data.shops[id]).filter(Boolean);
+  if (q) shops = shops.filter((s) => norm(s.name).includes(q));
+  const placed = shops.filter((s) => s.lat != null && s.lon != null);
+  const noPlace = shops.length - placed.length;
+
+  pinLayer.clearLayers();
+  // 回数の少ない店を先に置いて、よく行く店のピンが上に来るようにする
+  placed.sort((a, b) => counts[a.id] - counts[b.id]).forEach((s) => {
+    const n = counts[s.id];
+    const size = n >= 10 ? 30 : 26;
+    const icon = L.divIcon({ className: '', html: `<div class="pin${n >= 3 ? ' many' : ''}" style="width:${size}px;height:${size}px">${n}</div>`,
+      iconSize: [size, size], iconAnchor: [size / 2, size / 2], popupAnchor: [0, -size / 2] });
+    const last = visitsOf(s.id)[0];
+    const extra = [last.menu, last.star ? `★${last.star}` : ''].filter(Boolean).map(esc).join('・');
+    L.marker([s.lat, s.lon], { icon, title: s.name, zIndexOffset: n * 10 }).addTo(pinLayer)
+      .bindPopup(`<div class="pop"><b>${esc(s.name)}</b><span class="dist">${n}回・最後 ${shortDate(last.date)}${extra ? '・' + extra : ''}</span>` +
+        `<button type="button" class="sub" data-shop="${esc(s.id)}">記録を見る</button></div>`);
+  });
+
+  // 店の顔ぶれが変わったときだけ、全部のピンが入るように地図を動かす（毎回動くと見にくいので）
+  const key = placed.map((s) => s.id).sort().join('|');
+  if (key !== mapKey) {
+    mapKey = key;
+    if (placed.length === 1) map.setView([placed[0].lat, placed[0].lon], 16, { animate: false });
+    else if (placed.length > 1) map.fitBounds(L.latLngBounds(placed.map((s) => [s.lat, s.lon])), { padding: [30, 30], maxZoom: 16, animate: false });
+  }
+
+  $('mapTitle').textContent = q ? `地図で見る（「${$('search').value.trim()}」の店）` : '地図で見る（行った店）';
+  const notes = [];
+  if (!data.visits.length) notes.push('記録すると、行った店にピンが立つよ。');
+  else if (placed.length) notes.push('数字は行った回数。3回以上は赤。ピンをタップすると店の記録が見られるよ。');
+  if (noPlace) notes.push(`場所が分からない店が${noPlace}軒あるので、地図には出てないよ。`);
+  $('mapNote').textContent = notes.join('');
+}
+
+function showHere(pos) {
+  if (!map) return;
+  if (hereLayer) hereLayer.remove();
+  hereLayer = L.circleMarker([pos.lat, pos.lon], { radius: 7, color: '#fff', weight: 2, fillColor: '#2a7ae2', fillOpacity: 1 })
+    .bindTooltip('今いる場所').addTo(map);
 }
 
 // ---------- 近くの店 ----------
@@ -225,6 +289,7 @@ async function findNearby() {
   try {
     const pos = await getPosition();
     lastPos = pos;
+    showHere(pos);
     let osm = [], usedOsm = true;
     const b = await loadBundled().catch(() => null);
     if (b && inBox(b.bbox, pos.lat, pos.lon)) {
@@ -542,7 +607,7 @@ $('vDelete').addEventListener('click', () => {
 });
 
 // ---------- 検索 ----------
-$('search').addEventListener('input', renderVisited);
+$('search').addEventListener('input', () => { renderVisited(); renderMap(); });
 
 // ---------- バックアップ ----------
 function backupData() {

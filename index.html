@@ -9,6 +9,7 @@
   <link rel="manifest" href="manifest.webmanifest?v=3">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -50,6 +51,12 @@
       <p id="emptyNote" class="note">まだ記録がないよ。お店で「今いる場所から店を探す」を押してね。</p>
     </section>
 
+    <section id="mapSection">
+      <h2 id="mapTitle">地図で見る</h2>
+      <div id="map" class="map"></div>
+      <p id="mapNote" class="note"></p>
+    </section>
+
     <section>
       <h2>バックアップ</h2>
       <p id="backupNote" class="note"></p>
@@ -61,7 +68,7 @@
       </div>
     </section>
 
-    <p class="credit">店のデータ © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors</p>
+    <p class="credit">店と地図のデータ © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors</p>
   </main>
 
   <!-- 店の詳細 -->
@@ -129,6 +136,7 @@
 
   <div id="toast" class="toast" hidden><span id="toastText"></span><button id="toastUndo">取り消す</button></div>
 
+  <script src="vendor/leaflet/leaflet.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
