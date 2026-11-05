@@ -169,9 +169,9 @@ const MORE_MAX = 20;
 let moreShops = [];
 async function renderMore(q, shownIds) {
   if (!q) { $('moreBox').hidden = true; moreShops = []; return; }
-  const b = await loadBundled().catch(() => null);
+  const [b, food] = await Promise.all([loadBundled().catch(() => null), loadFood().catch(() => [])]);
   if (norm($('search').value) !== q) return;   // 待っている間に検索語が変わった
-  const pool = [...Object.values(data.shops), ...(b ? b.shops : [])];
+  const pool = [...Object.values(data.shops), ...(b ? b.shops : []), ...food];
   try {
     for (const c of Object.values(JSON.parse(localStorage.getItem(LIVE_CACHE_KEY)) || {})) pool.push(...c.shops);
   } catch (e) { /* なくてもいい */ }
@@ -194,14 +194,53 @@ async function renderMore(q, shownIds) {
   $('moreBox').hidden = false;
   $('moreTitle').textContent = `「${$('search').value.trim()}」行ってない店（${total}件）`;
   $('moreTable').hidden = !total;
-  $('moreTable').tBodies[0].innerHTML = moreShops.map((s, i) => `<tr>
-    <td>${highlight(s.name, q)}${s.dist != null ? `<br><span class="dist">今いる場所から${fmtDist(s.dist)}</span>` : ''}</td>
-    <td class="r"><button class="sub" data-more-map="${i}">地図</button> <button class="go" data-more-go="${i}">行った</button></td></tr>`).join('');
+  $('moreTable').tBodies[0].innerHTML = moreShops.map((s, i) => {
+    const info = [s.dist != null ? `今いる場所から${fmtDist(s.dist)}` : '', s.source === 'manual' ? '手で足した店' : '',
+      s.food ? 'ラーメン店とは書かれてない店' : ''].filter(Boolean).join('・');
+    return `<tr>
+    <td>${highlight(s.name, q)}${info ? `<br><span class="dist">${info}</span>` : ''}</td>
+    <td class="r"><button class="sub" data-more-map="${i}">地図</button> <button class="go" data-more-go="${i}">行った</button></td></tr>`;
+  }).join('');
   $('moreNote').hidden = false;
   $('moreNote').textContent = !total
-    ? (b ? '地図の店リストにも見つからなかった。お店にいるなら「地図にない店を足す」で入れてね。' : '店リストを読み込めなかった。')
+    ? (b ? '地図のデータ（OpenStreetMap）に、この名前の店が入ってなかった。下のGoogleマップで場所を確かめて、「地図で場所を選んで店を足す」で入れてね。' : '店リストを読み込めなかった。')
     : (total > MORE_MAX ? `多いので${MORE_MAX}件だけ出してるよ。もう少し詳しく入れてね。` : '') +
-      (b ? '札幌市内と、前に「店を探す」をした場所の店から探してるよ。' : '');
+      '札幌市内の飲食店と、前に「店を探す」をした場所の店から探してるよ。ない店は下から足せるよ。';
+  $('gmapLink').href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent($('search').value.trim() + ' ラーメン')}`;
+}
+
+// 札幌のラーメン店以外の飲食店（検索だけに使う。地図のタグにラーメンと書かれていない店を拾うため）
+let food = null;
+async function loadFood() {
+  if (food) return food;
+  const d = await (await fetch('data/sapporo-food.json')).json();
+  const kind = { n: 'node', w: 'way', r: 'relation' };
+  food = d.shops.map(([id, name, lat, lon]) => ({ id: `osm:${kind[id[0]]}/${id.slice(1)}`, name, lat, lon, source: 'osm', food: true }));
+  return food;
+}
+
+// ---------- 地図で場所を選んで店を足す（家から、行く前の店や地図にない店を入れるとき） ----------
+let picking = false;
+function setPicking(on) {
+  picking = on;
+  $('pickBtn').textContent = on ? '× 場所選びをやめる' : '＋ 地図で場所を選んで店を足す';
+  $('map').classList.toggle('picking', on);
+  if (on) {
+    $('mapSection').scrollIntoView({ block: 'center' });
+    toast('地図を動かして、店の場所をタップしてね');
+  }
+}
+$('pickBtn').addEventListener('click', () => setPicking(!picking));
+
+function pickAt(lat, lon) {
+  setPicking(false);
+  const name = prompt('店名', $('search').value.trim());
+  if (!name || !name.trim()) return;
+  const shop = { id: 'manual:' + uid(), name: name.trim(), lat, lon, source: 'manual' };
+  data.shops[shop.id] = shop;
+  save();
+  render();
+  toast(`${shop.name} を足したよ。行ったら「行った」を押してね`);
 }
 
 $('moreTable').addEventListener('click', (e) => {
@@ -254,6 +293,7 @@ function renderMap() {
       maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).addTo(map);
     pinLayer = L.layerGroup().addTo(map);
+    map.on('click', (e) => { if (picking) pickAt(e.latlng.lat, e.latlng.lng); });
     map.on('popupopen', (e) => {
       const b = e.popup.getElement().querySelector('button[data-shop]');
       if (b) b.addEventListener('click', () => { map.closePopup(); openShop(b.dataset.shop); });
