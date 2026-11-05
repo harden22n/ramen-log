@@ -5,6 +5,7 @@
 - 近くの店：位置情報で近い順に5軒出し、「行った」を1タップで記録。地図にない店は店名を手で足すと、その場所を覚えて次から候補に出る。
 - 札幌市内の店は `data/sapporo-ramen.json` に入れてある（OpenStreetMap から取得）。札幌の外では OpenStreetMap の検索サーバー（Overpass）に聞く。
 - 「行った」の直後に、頼んだもの・★（タップ）・写真（スマホの写真から選ぶ。アプリには長い辺1280pxに縮めた控えを IndexedDB に保存）・メモを入れる画面が出る。「あとで」で閉じて、店の詳細からあとで入れてもいい。
+- 行った店の一覧：ふだんは10軒まで（「もっと見る」で全部）。並べ方は回数順・最近行った順・★の高い順を切りかえられる。地図は一覧の上（店名で探している間は一覧の下）。
 - 地図で見る：行った店にピン（数字は回数、3回以上は赤）。ピンをタップすると店の記録へ。検索すると地図も絞られる。地図の絵は OpenStreetMap のタイル、地図の部品は Leaflet 1.9.4（`vendor/leaflet/`）。
 - おすすめ：★4以上なのに30日以上行ってない店を「また行こう」、★と頼んだもの・店名の言葉（味噌・塩・つけ麺など）から好みを推し量り、行ったことのない店を3軒まで「未訪問」として出す（今いる場所か最後に行った店から10km以内）。未訪問の店をタップすると地図に☆で出る。
 - Googleの店検索（Places API (New) の Text Search）：キーを画面の「Googleの店検索」に入れると、検索窓の「Googleで探す」で Google にある店を最大5件出して「行った」を押せる。Googleマップからの共有も、店名で Google に場所を聞いて OK だけで足せる。キーはファイルに書かず、そのスマホの localStorage にだけ置く（キーは Google Cloud で harden22n.github.io からだけ・Places API (New) だけに制限し、1日の回数の上限をつける）。
@@ -20,6 +21,7 @@
 - `sw.js` `manifest.webmanifest` `icons/` … ホーム画面に置くための設定（ファイルを直したら `sw.js` の `CACHE` の番号を上げる）
 - `data/sapporo-ramen.json` … 札幌のラーメン店リスト（`data/sapporo-food.json` はそれ以外の飲食店、検索用）。取り直すときは `node tools/update-sapporo.mjs`
 - `sync.js` `firebase-config.js` `firestore.rules` … みんなで共有
+- `vendor/markercluster/` … 地図の近くのピンをまとめる部品 Leaflet.markercluster 1.5.3（MIT）
 - `vendor/leaflet/` … 地図を出す部品 Leaflet 1.9.4（BSD-2-Clause）
 - `design/` … デザインの見本（決定.html が採用案）
 

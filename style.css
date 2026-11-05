@@ -169,3 +169,9 @@ button.gmap { width: 100%; text-align: left; font-family: inherit; }
 .fold > summary::after { content: '▼'; font-size: 10px; color: var(--usu); transition: transform .15s; }
 .fold:not([open]) > summary::after { transform: rotate(-90deg); }
 .fold[open] > summary { margin-bottom: 6px; }
+
+/* 一覧の並べ方（小さめの切りかえ） */
+.seg.small button { padding: 5px; font-size: 12px; }
+.seg[hidden] { display: none; }
+/* 地図のまとまり（近くの店をまとめた丸） */
+.pin.cluster { background: #fff; color: var(--ai); border: 3px solid var(--ai); font-size: 11px; }

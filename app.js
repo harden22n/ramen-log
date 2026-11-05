@@ -147,9 +147,21 @@ function renderVisited() {
 
   let rows = Object.keys(counts).map((id) => data.shops[id]).filter(Boolean);
   if (q) rows = rows.filter((s) => norm(s.name).includes(q));
-  rows.sort((a, b) => counts[b.id] - counts[a.id] || visitsOf(b.id)[0].date.localeCompare(visitsOf(a.id)[0].date));
+  // 並べ方：回数順・最近行った順・★の高い順（★は行った回の平均。★なしは下へ）
+  const lastDate = (id) => visitsOf(id)[0].date;
+  const avgStar = (id) => {
+    const st = visitsOf(id).map((v) => v.star).filter(Boolean);
+    return st.length ? st.reduce((a, b) => a + b, 0) / st.length : 0;
+  };
+  const byCount = (a, b) => counts[b.id] - counts[a.id] || lastDate(b.id).localeCompare(lastDate(a.id));
+  if (sortMode === 'recent') rows.sort((a, b) => lastDate(b.id).localeCompare(lastDate(a.id)) || byCount(a, b));
+  else if (sortMode === 'star') rows.sort((a, b) => avgStar(b.id) - avgStar(a.id) || byCount(a, b));
+  else rows.sort(byCount);
+  for (const b of $('sortSwitch').children) b.classList.toggle('on', b.dataset.sort === sortMode);
+  $('sortSwitch').hidden = rows.length < 2;
 
-  $('listTitle').textContent = q ? `「${$('search').value.trim()}」行った店（${rows.length}件）` : '行った店（回数順）';
+  $('listTitle').textContent = q ? `「${$('search').value.trim()}」行った店（${rows.length}件）` : `行った店（${rows.length}軒）`;
+  placeMap(!!q);
   $('nearbySection').hidden = !!q;   // 探している間は近くの店をしまって、結果を上に出す
   $('emptyNote').hidden = rows.length > 0;
   $('emptyNote').textContent = q ? 'この名前の店には、まだ行ってないよ。' : 'まだ記録がないよ。お店で「今いる場所から店を探す」を押してね。';
@@ -164,13 +176,50 @@ function renderVisited() {
   $('gmapLink').href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(word + ' ラーメン')}`;
   renderMore(q, new Set(rows.map((s) => s.id)));
 
+  // ふだんは上の LIST_MAX 軒だけ。探しているときと「もっと見る」を押したときは全部
+  const cut = !q && !showAllList && rows.length > LIST_MAX;
+  $('showAll').hidden = rows.length <= LIST_MAX || !!q;
+  $('showAll').textContent = showAllList ? '▲ たたむ' : `▼ もっと見る（全${rows.length}軒）`;
+  if (cut) rows = rows.slice(0, LIST_MAX);
+
   $('visitedTable').tBodies[0].innerHTML = rows.map((s) => {
     const last = visitsOf(s.id)[0];
-    const extra = [last.menu, last.star ? `★${last.star}` : ''].filter(Boolean).map(esc).join('・');
+    const avg = avgStar(s.id);
+    const starTxt = sortMode === 'star' && avg ? `★${Number.isInteger(avg) ? avg : avg.toFixed(1)}` : (last.star ? `★${last.star}` : '');
+    const extra = [last.menu, starTxt].filter(Boolean).map(esc).join('・');
     return `<tr class="tap" data-shop="${esc(s.id)}">
       <td>${highlight(s.name, q)}<br><span class="dist">最後 ${shortDate(last.date)}${extra ? '・' + extra : ''}</span></td>
       <td class="num">${counts[s.id]}回</td></tr>`;
   }).join('');
+}
+
+// ---------- 一覧の並べ方・もっと見る ----------
+const LIST_MAX = 10;
+const SORT_KEY = 'ramenlog.sort';
+let sortMode = (() => { try { return localStorage.getItem(SORT_KEY) || 'count'; } catch (e) { return 'count'; } })();
+let showAllList = false;
+
+$('sortSwitch').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-sort]');
+  if (!b) return;
+  sortMode = b.dataset.sort;
+  try { localStorage.setItem(SORT_KEY, sortMode); } catch (err) { /* 覚えられなくてもいい */ }
+  renderVisited();
+});
+$('showAll').addEventListener('click', () => {
+  showAllList = !showAllList;
+  renderVisited();
+  if (!showAllList) $('listSection').scrollIntoView({ block: 'start' });
+});
+
+// 地図はふだん一覧の上。店名で探している間は、結果を先に見せたいので一覧の下へ
+function placeMap(searching) {
+  const ms = $('mapSection'), ls = $('listSection');
+  const before = ms.nextElementSibling === ls;
+  if (searching === before) {
+    if (searching) ls.after(ms); else ls.before(ms);
+    if (map) setTimeout(() => map.invalidateSize(), 0);
+  }
 }
 
 // ---------- 検索窓の「Googleで探す」 ----------
@@ -535,7 +584,12 @@ function renderMap() {
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).addTo(map);
-    pinLayer = L.layerGroup().addTo(map);
+    // 近くの店のピンは丸にまとめる（数字は店の数。押すと拡大して分かれる）
+    pinLayer = (L.markerClusterGroup ? L.markerClusterGroup({
+      showCoverageOnHover: false, maxClusterRadius: 45, spiderfyOnMaxZoom: true,
+      iconCreateFunction: (c) => L.divIcon({ className: '', iconSize: [36, 36], iconAnchor: [18, 18],
+        html: `<div class="pin cluster" style="width:36px;height:36px">${c.getChildCount()}軒</div>` }),
+    }) : L.layerGroup()).addTo(map);
     map.on('click', (e) => { if (picking) pickAt(e.latlng.lat, e.latlng.lng); });
     map.on('popupopen', (e) => {
       const b = e.popup.getElement().querySelector('button[data-shop]');
@@ -575,7 +629,7 @@ function renderMap() {
   $('mapTitle').textContent = q ? `地図で見る（「${$('search').value.trim()}」の店）` : '地図で見る（行った店）';
   const notes = [];
   if (!shownVisits().length) notes.push('記録すると、行った店にピンが立つよ。');
-  else if (placed.length) notes.push('数字は行った回数。3回以上は赤。ピンをタップすると店の記録が見られるよ。');
+  else if (placed.length) notes.push('数字は行った回数。3回以上は赤。ピンをタップすると店の記録が見られるよ。「○軒」の丸は近くの店のまとまりで、押すと拡大するよ。');
   if (noPlace) notes.push(`場所が分からない店が${noPlace}軒あるので、地図には出てないよ。`);
   $('mapNote').textContent = notes.join('');
 }

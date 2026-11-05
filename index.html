@@ -10,6 +10,7 @@
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="vendor/markercluster/MarkerCluster.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -59,9 +60,17 @@
       <p id="recNote" class="note" hidden></p>
     </section>
 
-    <section>
-      <h2 id="listTitle">行った店（回数順）</h2>
+    <section id="mapSection">
+      <h2 id="mapTitle">地図で見る</h2>
+      <div id="map" class="map"></div>
+      <p id="mapNote" class="note"></p>
+    </section>
+
+    <section id="listSection">
+      <h2 id="listTitle">行った店</h2>
+      <div id="sortSwitch" class="seg small"><button type="button" data-sort="count">回数順</button><button type="button" data-sort="recent">最近行った順</button><button type="button" data-sort="star">★の高い順</button></div>
       <table id="visitedTable"><tbody></tbody></table>
+      <button id="showAll" class="link" hidden></button>
       <p id="emptyNote" class="note">まだ記録がないよ。お店で「今いる場所から店を探す」を押してね。</p>
       <div id="moreBox" hidden>
         <h2 id="moreTitle">行ってない店</h2>
@@ -71,12 +80,6 @@
           <button id="pickBtn" class="sub">＋ 地図で場所を選んで店を足す</button>
         </div>
       </div>
-    </section>
-
-    <section id="mapSection">
-      <h2 id="mapTitle">地図で見る</h2>
-      <div id="map" class="map"></div>
-      <p id="mapNote" class="note"></p>
     </section>
 
     <details id="shareSection" class="fold" data-fold="share">
@@ -191,6 +194,7 @@
   <div id="toast" class="toast" hidden><span id="toastText"></span><button id="toastUndo">取り消す</button></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="vendor/markercluster/leaflet.markercluster.js"></script>
   <script src="app.js"></script>
   <script type="module" src="sync.js"></script>
 </body>
