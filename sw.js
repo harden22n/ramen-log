@@ -1,6 +1,6 @@
 // オフラインでも画面が開けるように、アプリのファイルをスマホに置いておく係（サービスワーカー）
 // ファイルを直したら CACHE の番号を上げる（上げないと古い画面のままになる）
-const CACHE = 'ramenlog-v16';
+const CACHE = 'ramenlog-v17';
 const FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest', 'data/sapporo-ramen.json', 'data/sapporo-food.json', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'vendor/leaflet/leaflet.js', 'vendor/leaflet/leaflet.css', 'sync.js', 'firebase-config.js'];
 
 self.addEventListener('install', (e) => {

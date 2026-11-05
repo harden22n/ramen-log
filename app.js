@@ -238,13 +238,16 @@ $('pickBtn').addEventListener('click', () => setPicking(!picking));
 
 function pickAt(lat, lon) {
   setPicking(false);
-  const name = prompt('店名', $('search').value.trim());
+  const name = prompt('店名', pendingName || $('search').value.trim());
   if (!name || !name.trim()) return;
+  pendingName = '';
+  $('search').placeholder = '店名で探す';
   addPlace(name.trim(), lat, lon, '地図で選んだ店');
 }
 
 // 場所の分かった店を足して、検索にその店を出す（そこから「行った」を押せる）
 function addPlace(name, lat, lon, label) {
+  if (picking) setPicking(false);
   // 同じ名前の店が近くにもうあれば、それを使う
   let shop = Object.values(data.shops).find((s) => norm(s.name) === norm(name) && s.lat != null &&
     distance(lat, lon, s.lat, s.lon) < 300);
@@ -289,12 +292,15 @@ function parseShared(title, text, url) {
 }
 
 async function geocode(address) {
-  const res = await fetch('https://msearch.gsi.go.jp/address-search/AddressSearch?q=' + encodeURIComponent(address));
+  const res = await fetch('https://msearch.gsi.go.jp/address-search/AddressSearch?q=' + encodeURIComponent(address.normalize('NFKC')));
   const j = await res.json();
   if (!Array.isArray(j) || !j.length) return null;
   const [lon, lat] = j[0].geometry.coordinates;
   return { lat, lon };
 }
+
+// リンクだけ届いたときの店名（このあと住所を貼るか、地図をタップしたときに使う）
+let pendingName = '';
 
 async function addShared(title, text, url) {
   const p = parseShared(title, text, url);
@@ -303,29 +309,50 @@ async function addShared(title, text, url) {
   if (!pos && p.address) {
     toast('住所から場所を探してるよ…');
     try { pos = await geocode(p.address); } catch (e) { pos = null; }
+    if (!pos) alert(`住所（${p.address}）から場所が見つからなかった。地図で店の場所をタップしてね。`);
   }
-  const name = prompt(pos
-    ? `Googleマップの店を足すよ。店名を確かめてね。\n（場所：${p.address || '共有されたリンクの場所'}）`
-    : 'Googleマップから場所が読み取れなかった。店名を確かめたら、地図で店の場所をタップしてね。', p.name);
-  if (!name || !name.trim()) return true;
+  const defName = p.name || pendingName;
   if (pos) {
+    const name = prompt(`Googleマップの店を足すよ。店名を確かめてね。\n（場所：${p.address || 'リンクの場所'}）`, defName);
+    if (!name || !name.trim()) return true;
+    pendingName = '';
     addPlace(name.trim(), pos.lat, pos.lon, 'Googleマップから足した店');
-  } else {
-    $('search').value = name.trim();
-    render();
-    setPicking(true);
+    return true;
   }
+  // 場所が分からない：Googleマップのリンク（maps.app.goo.gl）は、アプリからは中身（場所）を読めない
+  const name = prompt('リンクだけだと場所が分からないんだ。まず店名を入れてね。\n\n' +
+    'このあと、どちらかで場所を決めるよ：\n' +
+    '・Googleマップで店の住所を長押ししてコピーし、検索窓に貼る\n' +
+    '・下の地図で店の場所をタップする', defName);
+  if (!name || !name.trim()) return true;
+  pendingName = name.trim();
+  $('search').value = '';
+  render();
+  setPicking(true);
+  $('search').placeholder = `「${pendingName}」の住所を貼ってね`;
   return true;
 }
 
-// 検索窓に Googleマップの共有を貼ったとき
+// 検索窓に Googleマップの共有や住所を貼ったとき
+function looksShared(t) {
+  return GMAP_URL_RE.test(t) || (ADDR_RE.test(t) && /丁目|番地|条|\d+-\d+|〒/.test(t));
+}
+function takeShared(t) {
+  $('search').value = '';
+  $('search').placeholder = '店名で探す';
+  render();
+  addShared(GMAP_URL_RE.test(t) ? '' : pendingName, t, '');
+}
 $('search').addEventListener('paste', (e) => {
   const t = e.clipboardData?.getData('text') || '';
-  if (!GMAP_URL_RE.test(t)) return;
+  if (!looksShared(t)) return;
   e.preventDefault();
-  $('search').value = '';
-  render();
-  addShared('', t, '');
+  takeShared(t);
+});
+// 貼り付けを paste で拾えなかったとき（キーボードの候補から入れたときなど）
+$('search').addEventListener('change', () => {
+  const t = $('search').value;
+  if (looksShared(t)) takeShared(t);
 });
 
 $('moreTable').addEventListener('click', (e) => {
@@ -980,15 +1007,6 @@ $('search').addEventListener('input', () => {
   renderVisited();
   renderMap();
   $('recSection').hidden = !!norm($('search').value) || (!recShops.length && $('recNote').hidden);
-});
-
-// 「行った」の詳しい画面などで input イベント経由で URL だけが入ったとき（貼り付けを paste で拾えなかった場合）
-$('search').addEventListener('change', () => {
-  const t = $('search').value;
-  if (!GMAP_URL_RE.test(t)) return;
-  $('search').value = '';
-  render();
-  addShared('', t, '');
 });
 
 // ---------- バックアップ ----------
