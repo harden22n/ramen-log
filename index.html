@@ -38,6 +38,12 @@
 
     <input id="search" class="search" type="search" placeholder="店名で探す" autocomplete="off" enterkeyhint="search">
     <a id="gmapLink" class="gmap" target="_blank" rel="noopener" hidden>🔍 Googleマップで「<span id="gmapWord"></span>」を探す</a>
+    <button id="gSearchBtn" class="gmap" hidden>🔍 Googleで「<span id="gWord"></span>」を探す</button>
+    <div id="gBox" hidden>
+      <h2 id="gTitle">Googleで見つけた店</h2>
+      <table id="gTable"><tbody></tbody></table>
+      <p id="gNote" class="note" hidden></p>
+    </div>
 
     <section id="nearbySection">
       <h2>近くの店</h2>
@@ -93,6 +99,16 @@
         <button id="leaveGroup" class="sub">グループを抜ける</button>
       </div>
       <button id="logoutBtn" class="link" hidden>ログアウト</button>
+    </section>
+
+    <section>
+      <h2>Googleの店検索</h2>
+      <p id="placesNote" class="note"></p>
+      <div class="row">
+        <input id="placesKeyInput" class="search" type="password" placeholder="APIキー" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <button id="placesSave" class="go">保存</button>
+      </div>
+      <button id="placesClear" class="link" hidden>キーを消す</button>
     </section>
 
     <section>

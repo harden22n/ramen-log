@@ -155,7 +155,11 @@ function renderVisited() {
   $('emptyNote').textContent = q ? 'この名前の店には、まだ行ってないよ。' : 'まだ記録がないよ。お店で「今いる場所から店を探す」を押してね。';
   // 検索窓のすぐ下に、Googleマップで探すリンク（地図のデータにない店を確かめる用）
   const word = $('search').value.trim();
-  $('gmapLink').hidden = !q;
+  // Google の店検索が使えるときは、アプリの中で Google に聞くボタン。使えないときは Googleマップを開くリンク
+  $('gmapLink').hidden = !q || !!placesKey();
+  $('gSearchBtn').hidden = !q || !placesKey();
+  $('gWord').textContent = word;
+  if (gWordShown !== word) { $('gBox').hidden = true; gShops = []; }
   $('gmapWord').textContent = word;
   $('gmapLink').href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(word + ' ラーメン')}`;
   renderMore(q, new Set(rows.map((s) => s.id)));
@@ -168,6 +172,51 @@ function renderVisited() {
       <td class="num">${counts[s.id]}回</td></tr>`;
   }).join('');
 }
+
+// ---------- 検索窓の「Googleで探す」 ----------
+let gShops = [], gWordShown = '';
+$('gSearchBtn').addEventListener('click', async () => {
+  const word = $('search').value.trim();
+  if (!word) return;
+  $('gSearchBtn').disabled = true;
+  $('gBox').hidden = false;
+  $('gTitle').textContent = `Googleで「${word}」を探してるよ…`;
+  $('gTable').hidden = true;
+  $('gNote').hidden = true;
+  try {
+    gShops = await placesSearch(word, 5);
+    gWordShown = word;
+    $('gTitle').textContent = `Googleで見つけた店（${gShops.length}件）`;
+    renderGoogle();
+  } catch (e) {
+    $('gTitle').textContent = 'Googleの店検索';
+    $('gNote').hidden = false;
+    $('gNote').textContent = `うまくいかなかった（${e.message}）。下の「Googleの店検索」のキーを確かめてね。`;
+  } finally {
+    $('gSearchBtn').disabled = false;
+  }
+});
+
+function renderGoogle() {
+  const base = lastPos;
+  $('gTable').hidden = !gShops.length;
+  $('gTable').tBodies[0].innerHTML = gShops.map((g, i) => {
+    const info = [base ? `今いる場所から${fmtDist(distance(base.lat, base.lon, g.lat, g.lon))}` : '', g.address].filter(Boolean).map(esc).join('・');
+    return `<tr><td>${esc(g.name)}<br><span class="dist">${info}</span></td>
+      <td class="r"><button class="sub" data-g-map="${i}">地図</button> <button class="go" data-g-go="${i}">行った</button></td></tr>`;
+  }).join('');
+  $('gNote').hidden = !!gShops.length;
+  $('gNote').textContent = 'Googleでも見つからなかった。';
+}
+
+$('gTable').addEventListener('click', (e) => {
+  const m = e.target.closest('button[data-g-map]');
+  const go = e.target.closest('button[data-g-go]');
+  const g = gShops[Number((m || go)?.dataset.gMap ?? (m || go)?.dataset.gGo)];
+  if (!g) return;
+  if (m) { showOnMap(g, g.address || 'Googleで見つけた店'); return; }
+  addVisit(addGooglePlace(g));
+});
 
 // 探しているとき：行ってない店も、地図の店リスト（札幌＋前に調べた場所）と手で足した店から出す
 const MORE_MAX = 20;
@@ -299,12 +348,80 @@ async function geocode(address) {
   return { lat, lon };
 }
 
+// ---------- Google の店検索（Places API） ----------
+// キーはファイルに書かず、このスマホのブラウザの中（localStorage）にだけ覚える。下の「Googleの店検索」の欄で入れる
+const PLACES_KEY = 'ramenlog.placesKey';
+const placesKey = () => { try { return localStorage.getItem(PLACES_KEY) || ''; } catch (e) { return ''; } };
+
+// 店名などで Google に聞いて、見つかった店（最大 n 件）を返す。近くの店を優先する
+async function placesSearch(query, n = 1) {
+  const key = placesKey();
+  if (!key) return [];
+  const near = lastPos || (() => {
+    const s = myVisits().map((v) => data.shops[v.shopId]).find((x) => x && x.lat != null);
+    return s ? { lat: s.lat, lon: s.lon } : { lat: SAPPORO[0], lon: SAPPORO[1] };
+  })();
+  const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': key,
+      'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location' },
+    body: JSON.stringify({ textQuery: query, languageCode: 'ja', regionCode: 'JP', maxResultCount: n,
+      locationBias: { circle: { center: { latitude: near.lat, longitude: near.lon }, radius: 50000 } } }),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.error?.message || `HTTP ${res.status}`);
+  return (j.places || []).map((p) => ({
+    id: 'gplace:' + p.id, name: p.displayName?.text || query, lat: p.location.latitude, lon: p.location.longitude,
+    source: 'manual', address: (p.formattedAddress || '').replace(/^日本、(〒\d{3}-\d{4}\s*)?/, ''),
+  }));
+}
+
+// Google で見つけた店を足す（同じ店がもうあればそれを使う）
+function addGooglePlace(g) {
+  let shop = data.shops[g.id] || Object.values(data.shops).find((s) => norm(s.name) === norm(g.name) && s.lat != null &&
+    distance(g.lat, g.lon, s.lat, s.lon) < 300);
+  if (!shop) {
+    shop = { id: g.id, name: g.name, lat: g.lat, lon: g.lon, source: 'manual' };
+    data.shops[shop.id] = shop;
+    save();
+  }
+  return shop;
+}
+
 // リンクだけ届いたときの店名（このあと住所を貼るか、地図をタップしたときに使う）
 let pendingName = '';
 
 async function addShared(title, text, url) {
   const p = parseShared(title, text, url);
   if (!p.link && !p.address && p.lat == null) return false;
+  // Google の店検索が使えるときは、店名（と住所）で Google に場所を聞く。OK を押すだけで足せる
+  if (placesKey() && p.lat == null) {
+    let query = [p.name, p.address].filter(Boolean).join(' ');
+    if (!query) {
+      const n = prompt('Googleマップのリンクだけ届いたよ。店名を入れてね（Googleで場所を探すよ）', pendingName);
+      if (!n || !n.trim()) return true;
+      query = n.trim();
+    }
+    toast('Googleで店を探してるよ…');
+    try {
+      const [g] = await placesSearch(query);
+      if (g) {
+        if (!confirm(`この店を足す？\n\n${g.name}\n${g.address}`)) return true;
+        pendingName = '';
+        const shop = addGooglePlace(g);
+        $('search').value = shop.name;
+        render();
+        showOnMap(shop, 'Googleマップから足した店');
+        $('search').scrollIntoView({ block: 'start' });
+        toast(`${shop.name} を足したよ。行ったら「行った」を押してね`);
+        return true;
+      }
+      if (!p.address) { alert(`Googleで「${query}」が見つからなかった。`); return true; }
+    } catch (e) {
+      alert(`Googleの店検索でうまくいかなかった（${e.message}）。`);
+      if (!p.address) return true;
+    }
+  }
   let pos = p.lat != null ? { lat: p.lat, lon: p.lon } : null;
   if (!pos && p.address) {
     toast('住所から場所を探してるよ…');
@@ -1008,6 +1125,31 @@ $('search').addEventListener('input', () => {
   renderMap();
   $('recSection').hidden = !!norm($('search').value) || (!recShops.length && $('recNote').hidden);
 });
+
+// ---------- Googleの店検索のキー ----------
+function renderPlacesKey() {
+  const k = placesKey();
+  $('placesNote').textContent = k
+    ? `キーは入ってるよ（…${k.slice(-4)}）。検索窓の「Googleで探す」と、Googleマップからの共有で使う。キーはこのスマホの中にだけある。`
+    : 'Google Cloud で作った Places API のキーを入れると、Googleマップにある店を店名で探して足せるようになる。キーはこのスマホの中にだけ覚える（ほかには送らない）。';
+  $('placesClear').hidden = !k;
+  $('placesKeyInput').value = '';
+}
+$('placesSave').addEventListener('click', () => {
+  const k = $('placesKeyInput').value.trim();
+  if (!k) return;
+  try { localStorage.setItem(PLACES_KEY, k); } catch (e) { alert('保存できなかった'); return; }
+  renderPlacesKey();
+  renderVisited();
+  toast('キーを保存したよ');
+});
+$('placesClear').addEventListener('click', () => {
+  if (!confirm('Googleの店検索のキーを消す？')) return;
+  try { localStorage.removeItem(PLACES_KEY); } catch (e) { /* なくてもいい */ }
+  renderPlacesKey();
+  renderVisited();
+});
+renderPlacesKey();
 
 // ---------- バックアップ ----------
 function backupData() {
