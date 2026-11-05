@@ -142,3 +142,10 @@ dialog::backdrop { background: rgba(20, 20, 30, .45); }
 .tag.again { border-color: var(--aka); color: var(--aka); }
 .pin.rec { background: #d4a017; font-size: 14px; }
 .pop a.btn { display: inline-block; font-size: 13px; padding: 6px 10px; text-decoration: none; }
+
+/* みんなで共有 */
+.seg { display: flex; margin-bottom: 8px; border: 1px solid var(--ai); border-radius: 6px; overflow: hidden; }
+.seg button { flex: 1; border: none; background: #fff; color: var(--ai); padding: 7px; font-size: 13px; }
+.seg button.on { background: var(--ai); color: #fff; }
+.share label { font-size: 12px; color: var(--usu); display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+.share .row input { flex: 1; margin: 0; }

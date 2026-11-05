@@ -9,12 +9,15 @@
 - おすすめ：★4以上なのに30日以上行ってない店を「また行こう」、★と頼んだもの・店名の言葉（味噌・塩・つけ麺など）から好みを推し量り、行ったことのない店を3軒まで「未訪問」として出す（今いる場所か最後に行った店から10km以内）。未訪問の店をタップすると地図に☆で出る。
 - 店名で検索（全角半角・カタカナひらがなの違いは気にしなくていい）。
 - バックアップ：「Obsidianに保存」で保管庫の `プロジェクト/ラーメン記録/拉麺帖バックアップ.md` に上書き保存（obsidian:// のリンクを使う）。JSON ファイルへの書き出しもできる。読み込みは .json と .md のどちらでもよく、今の記録に足すだけで消さない。
-- 記録はスマホのブラウザの中（localStorage）だけに保存する。サーバーには送らない。
+- 記録はスマホのブラウザの中（localStorage）に保存する。
+- みんなで共有（`sync.js`）：Google でログインし、合言葉のグループに入ると、店・行った日・頼んだもの・★・メモ・記録した人の名前を Firebase（Firestore）でそろえる。写真は共有しない（各自のスマホの中だけ）。直せるのは自分の記録だけ。「みんなの記録／自分の記録」で数え方を切りかえられる。おすすめは自分の記録だけから選ぶ。
+  - 設定は `firebase-config.js`（null のあいだは共有の欄が出ない）。守りのルールは `firestore.rules` を Firebase コンソールに貼る。
 
 ## ファイル
 - `index.html` `style.css` `app.js` … 画面と動き
 - `sw.js` `manifest.webmanifest` `icons/` … ホーム画面に置くための設定（ファイルを直したら `sw.js` の `CACHE` の番号を上げる）
 - `data/sapporo-ramen.json` … 札幌のラーメン店リスト。取り直すときは `node tools/update-sapporo.mjs`
+- `sync.js` `firebase-config.js` `firestore.rules` … みんなで共有
 - `vendor/leaflet/` … 地図を出す部品 Leaflet 1.9.4（BSD-2-Clause）
 - `design/` … デザインの見本（決定.html が採用案）
 

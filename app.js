@@ -77,8 +77,46 @@ function norm(s) {
     .replace(/\s+/g, '');
 }
 
+// ---------- みんなで共有（sync.js がグループにつながったら使う） ----------
+// 共有中は data がグループ全員の記録の写しになる。v.by は記録した人の印（Firebase の uid）
+window.cloudMe = null;   // { uid, name }  ログインしてグループに入っているとき
+window.cloud = null;     // { put(kind, obj), del(kind, id) }
+const VIEW_KEY = 'ramenlog.view';
+let viewMine = localStorage.getItem(VIEW_KEY) === 'me';   // 「自分」だけを数えるか
+
+function isMine(v) {
+  return !v.by || !window.cloudMe || v.by === window.cloudMe.uid;
+}
+function myVisits() {
+  return data.visits.filter(isMine);
+}
+// 画面に出す記録：共有中に「自分」を選んでいれば自分の分だけ
+function shownVisits() {
+  return window.cloud && viewMine ? myVisits() : data.visits;
+}
+function cloudPut(kind, obj) {
+  if (window.cloud) window.cloud.put(kind, obj);
+}
+function cloudDel(kind, id) {
+  if (window.cloud) window.cloud.del(kind, id);
+}
+window.getData = () => data;
+window.saveLocal = save;
+
+// 写真がこのスマホにある記録の id（共有の記録には写真の有無が入らないので、こちらで覚えておく）
+const photoIds = new Set(data.visits.filter((v) => v.photo).map((v) => v.id));
+
+// sync.js から：グループの最新の記録が届いた
+window.applyCloud = (shops, visits) => {
+  data.shops = Object.assign({}, data.shops, shops);
+  data.visits = visits.map((v) => ({ ...v, photo: photoIds.has(v.id) }));
+  save();
+  render();
+  if ($('shopDialog').open) renderShop();
+};
+
 function visitsOf(shopId) {
-  return data.visits.filter((v) => v.shopId === shopId).sort((a, b) => b.date.localeCompare(a.date));
+  return shownVisits().filter((v) => v.shopId === shopId).sort((a, b) => b.date.localeCompare(a.date));
 }
 
 // ---------- 画面の更新 ----------
@@ -94,15 +132,18 @@ function render() {
 function renderStats() {
   const y = String(new Date().getFullYear());
   const ym = today().slice(0, 7);
-  $('statYear').textContent = data.visits.filter((v) => v.date.startsWith(y)).length;
-  $('statMonth').textContent = data.visits.filter((v) => v.date.startsWith(ym)).length;
-  $('statShops').textContent = new Set(data.visits.map((v) => v.shopId)).size;
+  const vs = shownVisits();
+  $('statYear').textContent = vs.filter((v) => v.date.startsWith(y)).length;
+  $('statMonth').textContent = vs.filter((v) => v.date.startsWith(ym)).length;
+  $('statShops').textContent = new Set(vs.map((v) => v.shopId)).size;
+  $('viewSwitch').hidden = !window.cloud;
+  for (const b of $('viewSwitch').children) b.classList.toggle('on', (b.dataset.view === 'me') === viewMine);
 }
 
 function renderVisited() {
   const q = norm($('search').value);
   const counts = {};
-  for (const v of data.visits) counts[v.shopId] = (counts[v.shopId] || 0) + 1;
+  for (const v of shownVisits()) counts[v.shopId] = (counts[v.shopId] || 0) + 1;
 
   let rows = Object.keys(counts).map((id) => data.shops[id]).filter(Boolean);
   if (q) rows = rows.filter((s) => norm(s.name).includes(q));
@@ -169,7 +210,7 @@ function renderMap() {
   }
   const q = norm($('search').value);
   const counts = {};
-  for (const v of data.visits) counts[v.shopId] = (counts[v.shopId] || 0) + 1;
+  for (const v of shownVisits()) counts[v.shopId] = (counts[v.shopId] || 0) + 1;
   let shops = Object.keys(counts).map((id) => data.shops[id]).filter(Boolean);
   if (q) shops = shops.filter((s) => norm(s.name).includes(q));
   const placed = shops.filter((s) => s.lat != null && s.lon != null);
@@ -199,7 +240,7 @@ function renderMap() {
 
   $('mapTitle').textContent = q ? `地図で見る（「${$('search').value.trim()}」の店）` : '地図で見る（行った店）';
   const notes = [];
-  if (!data.visits.length) notes.push('記録すると、行った店にピンが立つよ。');
+  if (!shownVisits().length) notes.push('記録すると、行った店にピンが立つよ。');
   else if (placed.length) notes.push('数字は行った回数。3回以上は赤。ピンをタップすると店の記録が見られるよ。');
   if (noPlace) notes.push(`場所が分からない店が${noPlace}軒あるので、地図には出てないよ。`);
   $('mapNote').textContent = notes.join('');
@@ -236,7 +277,7 @@ function tastesOf(text) {
 // 好みの点数：★5なら+3、★4は+2、★3は+1、★なしは+1、★2は0、★1は-1
 function tasteScores() {
   const score = {};
-  for (const v of data.visits) {
+  for (const v of myVisits()) {
     const shop = data.shops[v.shopId];
     if (!shop) continue;
     const w = v.star ? v.star - 2 : 1;
@@ -250,13 +291,15 @@ function daysSince(iso) {
 }
 
 async function renderRecommend() {
-  if (!data.visits.length) { recShops = []; $('recSection').hidden = true; return; }
+  const mine = myVisits();
+  if (!mine.length) { recShops = []; $('recSection').hidden = true; return; }
   const rows = [];
+  const myVisitsOf = (id) => mine.filter((v) => v.shopId === id).sort((a, b) => b.date.localeCompare(a.date));
 
   // ① ★が高いのに、しばらく行っていない店
   const again = [];
-  for (const id of new Set(data.visits.map((v) => v.shopId))) {
-    const vs = visitsOf(id), stars = vs.map((v) => v.star).filter(Boolean);
+  for (const id of new Set(mine.map((v) => v.shopId))) {
+    const vs = myVisitsOf(id), stars = vs.map((v) => v.star).filter(Boolean);
     if (!stars.length || !data.shops[id]) continue;
     const avg = stars.reduce((a, b) => a + b, 0) / stars.length;
     const days = daysSince(vs[0].date);
@@ -276,8 +319,8 @@ async function renderRecommend() {
     note = '★や頼んだもの（味噌・塩・つけ麺など）を入れていくと、好みに近い行ったことのない店も出すよ。';
   } else {
     // 基準の場所：さっき調べた今いる場所。なければ最後に行った店
-    const lastShop = data.visits.map((v) => data.shops[v.shopId]).filter((s) => s && s.lat != null)
-      .sort((a, b) => visitsOf(b.id)[0].date.localeCompare(visitsOf(a.id)[0].date))[0];
+    const lastShop = mine.map((v) => data.shops[v.shopId]).filter((s) => s && s.lat != null)
+      .sort((a, b) => myVisitsOf(b.id)[0].date.localeCompare(myVisitsOf(a.id)[0].date))[0];
     const base = lastPos ? { lat: lastPos.lat, lon: lastPos.lon, label: '今いる場所' }
       : lastShop ? { lat: lastShop.lat, lon: lastShop.lon, label: lastShop.name } : null;
     const b = await loadBundled().catch(() => null);
@@ -285,7 +328,7 @@ async function renderRecommend() {
     try {   // 札幌の外で前に調べた店も候補に入れる
       for (const c of Object.values(JSON.parse(localStorage.getItem(LIVE_CACHE_KEY)) || {})) pool.push(...c.shops);
     } catch (e) { /* なくてもいい */ }
-    const visitedNames = new Set(Object.keys(data.shops).filter((id) => visitsOf(id).length).map((id) => norm(data.shops[id].name)));
+    const visitedNames = new Set(mine.map((v) => data.shops[v.shopId]).filter(Boolean).map((s) => norm(s.name)));
     const best = new Map();
     for (const s of pool) {
       if (visitedNames.has(norm(s.name))) continue;   // 同じ名前の店（チェーンの別店舗も）にはもう行っている
@@ -482,8 +525,11 @@ function addVisit(shop) {
     data.shops[shop.id] = { id: shop.id, name: shop.name, lat: shop.lat ?? null, lon: shop.lon ?? null, source: shop.source };
   }
   const v = { id: uid(), shopId: shop.id, date: today(), menu: '', star: null, memo: '', photo: false };
+  if (window.cloud) Object.assign(v, { by: window.cloudMe.uid, byName: window.cloudMe.name });
   data.visits.push(v);
   save();
+  cloudPut('shop', data.shops[shop.id]);
+  cloudPut('visit', v);
   render();
   // 記録はもう済んでいる。続けて頼んだもの・★・写真を入れる画面を出す（「あとで」で閉じてもいい）
   openVisit(v.id, true);
@@ -495,8 +541,9 @@ function removeVisit(id) {
   data.visits = data.visits.filter((x) => x.id !== id);
   if (v.photo) delPhoto(id).catch(() => {});
   // 記録が1つもなくなった、地図から来た店は覚えておかなくていい
-  if (!visitsOf(v.shopId).length && data.shops[v.shopId]?.source === 'osm') delete data.shops[v.shopId];
+  if (!data.visits.some((x) => x.shopId === v.shopId) && data.shops[v.shopId]?.source === 'osm') delete data.shops[v.shopId];
   save();
+  cloudDel('visit', id);
   render();
 }
 
@@ -551,9 +598,11 @@ function renderShop() {
     ? `${vs.length}回行った。最初 ${shortDate(vs[vs.length - 1].date)}／最後 ${shortDate(vs[0].date)}。行をタップすると頼んだもの・★・メモを入れられるよ。`
     : 'まだ記録がないよ。';
   $('visitList').innerHTML = vs.map((v) => {
+    const who = window.cloud && v.byName ? `${v.byName}：` : '';
     const extra = [v.menu, v.star ? `★${v.star}` : '', v.memo].filter(Boolean).map(esc).join('・');
+    const hint = isMine(v) ? '（タップして書き足す）' : '';
     return `<li data-visit="${esc(v.id)}">${v.photo ? `<img class="thumb" data-photo="${esc(v.id)}" alt="">` : ''}` +
-      `<span class="v-main"><span>${shortDate(v.date)}</span><span class="dist">${extra || '（タップして書き足す）'}</span></span></li>`;
+      `<span class="v-main"><span>${shortDate(v.date)}</span><span class="dist">${esc(who)}${extra || hint}</span></span></li>`;
   }).join('');
   // 写真の小さい控えは、あとから読み込んで差し込む
   for (const img of $('visitList').querySelectorAll('img[data-photo]')) {
@@ -580,6 +629,7 @@ $('renameBtn').addEventListener('click', () => {
   if (!name || !name.trim()) return;
   s.name = name.trim();
   save();
+  cloudPut('shop', s);
   render();
   renderShop();
 });
@@ -610,8 +660,9 @@ async function photoStore(mode, fn) {
 }
 
 const getPhoto = (id) => photoStore('readonly', (s) => s.get(id));
-const putPhoto = (id, blob) => photoStore('readwrite', (s) => s.put(blob, id));
-const delPhoto = (id) => photoStore('readwrite', (s) => s.delete(id));
+const putPhoto = (id, blob) => photoStore('readwrite', (s) => s.put(blob, id)).then((r) => { photoIds.add(id); return r; });
+const delPhoto = (id) => photoStore('readwrite', (s) => s.delete(id)).then((r) => { photoIds.delete(id); return r; });
+photoStore('readonly', (s) => s.getAllKeys()).then((keys) => keys.forEach((k) => photoIds.add(k))).catch(() => {});
 
 async function shrinkPhoto(file) {
   const bmp = await createImageBitmap(file);   // スマホ写真の向き（縦横）も直してくれる
@@ -667,7 +718,10 @@ function openVisit(id, fresh) {
 
 $('visitList').addEventListener('click', (e) => {
   const li = e.target.closest('li[data-visit]');
-  if (li) openVisit(li.dataset.visit, false);
+  if (!li) return;
+  const v = data.visits.find((x) => x.id === li.dataset.visit);
+  if (v && !isMine(v)) { toast(`${v.byName || 'ほかの人'}の記録は直せないよ`); return; }
+  openVisit(li.dataset.visit, false);
 });
 
 $('vStars').addEventListener('click', (e) => {
@@ -717,6 +771,7 @@ $('visitDialog').addEventListener('close', async () => {
       }
     }
     save();
+    cloudPut('visit', v);
   }
   showPhoto(null);
   editPhoto = null;
@@ -733,6 +788,15 @@ $('vDelete').addEventListener('click', () => {
   editFresh = false;
   $('visitDialog').close();
   toast('記録を取り消したよ');
+});
+
+// ---------- みんな／自分 の切りかえ（共有中だけ出る） ----------
+$('viewSwitch').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-view]');
+  if (!b) return;
+  viewMine = b.dataset.view === 'me';
+  localStorage.setItem(VIEW_KEY, viewMine ? 'me' : 'all');
+  render();
 });
 
 // ---------- 検索 ----------
@@ -851,7 +915,9 @@ $('importFile').addEventListener('change', async () => {
   const have = new Set(data.visits.map((v) => v.id));
   for (const v of d.visits) {
     if (v && v.id && !have.has(v.id) && data.shops[v.shopId] && /^\d{4}-\d{2}-\d{2}$/.test(v.date)) {
+      if (window.cloud && !v.by) Object.assign(v, { by: window.cloudMe.uid, byName: window.cloudMe.name });
       data.visits.push(v); addVisits++;
+      if (!v.by || isMine(v)) { cloudPut('shop', data.shops[v.shopId]); cloudPut('visit', v); }
     }
   }
   save();

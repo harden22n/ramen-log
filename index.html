@@ -29,6 +29,7 @@
       </div>
     </div>
 
+    <div id="viewSwitch" class="seg" hidden><button type="button" data-view="all">みんなの記録</button><button type="button" data-view="me">自分の記録</button></div>
     <div class="stats">
       <div class="s"><b id="statYear">0</b>今年の杯数</div>
       <div class="s"><b id="statShops">0</b>行った店</div>
@@ -61,6 +62,28 @@
       <h2 id="mapTitle">地図で見る</h2>
       <div id="map" class="map"></div>
       <p id="mapNote" class="note"></p>
+    </section>
+
+    <section id="shareSection">
+      <h2>みんなで共有</h2>
+      <p id="shareNote" class="note">共有の準備をしてるよ…</p>
+      <div id="shareOut" hidden>
+        <button id="loginBtn" class="wide">Googleでログイン</button>
+      </div>
+      <div id="shareNoGroup" class="share" hidden>
+        <label>みんなに見える名前<input id="myName" class="search" type="text" maxlength="20" placeholder="例：元木"></label>
+        <button id="makeGroup" class="wide">新しいグループを作る</button>
+        <p class="note">誰かのグループに入るときは、もらった合言葉を入れてね。</p>
+        <div class="row">
+          <input id="joinCode" class="search" type="text" placeholder="合言葉" autocomplete="off" autocapitalize="off">
+          <button id="joinBtn" class="go">入る</button>
+        </div>
+      </div>
+      <div id="shareIn" class="row" hidden>
+        <button id="sendCode" class="go">合言葉を送る</button>
+        <button id="leaveGroup" class="sub">グループを抜ける</button>
+      </div>
+      <button id="logoutBtn" class="link" hidden>ログアウト</button>
     </section>
 
     <section>
@@ -144,5 +167,6 @@
 
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="app.js"></script>
+  <script type="module" src="sync.js"></script>
 </body>
 </html>
