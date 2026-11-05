@@ -240,12 +240,93 @@ function pickAt(lat, lon) {
   setPicking(false);
   const name = prompt('店名', $('search').value.trim());
   if (!name || !name.trim()) return;
-  const shop = { id: 'manual:' + uid(), name: name.trim(), lat, lon, source: 'manual' };
-  data.shops[shop.id] = shop;
-  save();
+  addPlace(name.trim(), lat, lon, '地図で選んだ店');
+}
+
+// 場所の分かった店を足して、検索にその店を出す（そこから「行った」を押せる）
+function addPlace(name, lat, lon, label) {
+  // 同じ名前の店が近くにもうあれば、それを使う
+  let shop = Object.values(data.shops).find((s) => norm(s.name) === norm(name) && s.lat != null &&
+    distance(lat, lon, s.lat, s.lon) < 300);
+  if (!shop) {
+    shop = { id: 'manual:' + uid(), name, lat, lon, source: 'manual' };
+    data.shops[shop.id] = shop;
+    save();
+  }
+  $('search').value = shop.name;
   render();
+  $('search').scrollIntoView({ block: 'start' });
+  showOnMap(shop, label);
+  $('search').scrollIntoView({ block: 'start' });
   toast(`${shop.name} を足したよ。行ったら「行った」を押してね`);
 }
+
+// ---------- Googleマップから共有された店を足す ----------
+// Android：Googleマップの「共有」→「拉麺帖」で、店名・住所・リンクが ?share-title=…&share-text=…&share-url=… で届く
+// （manifest.webmanifest の share_target）。iPhone などは、共有のテキストを検索窓に貼っても同じように足せる。
+// リンク（maps.app.goo.gl）の中の場所はブラウザからは読めないので、住所を国土地理院の住所検索で場所にする。
+const GMAP_URL_RE = /https?:\/\/(?:maps\.app\.goo\.gl|goo\.gl\/maps|(?:www\.|maps\.)?google\.[a-z.]+\/maps)\S*/i;
+const ADDR_RE = /(?:〒\s?\d{3}-?\d{4}\s*)?((?:北海道|東京都|京都府|大阪府|[^\s\d、,]{2,3}県)[^\s\n,]+)/;
+
+function parseShared(title, text, url) {
+  const all = [title, text, url].filter(Boolean).join('\n');
+  const link = (all.match(GMAP_URL_RE) || [''])[0];
+  let lat = null, lon = null;
+  const c = all.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || all.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) ||
+    all.match(/[?&](?:q|query|ll|center)=(-?\d+\.\d+)(?:,|%2C)\s*(-?\d+\.\d+)/i);
+  if (c) { lat = Number(c[1]); lon = Number(c[2]); }
+  const body = [text, url].filter(Boolean).join('\n').replace(GMAP_URL_RE, '').replace(/日本、/g, '');
+  const am = body.match(ADDR_RE);
+  const address = am ? am[1] : '';
+  // 店名：共有の題名。なければ住所より前の最初の行
+  let name = (title || '').trim();
+  if (!name) {
+    const before = am ? body.slice(0, am.index) : body;
+    name = before.split('\n').map((l) => l.trim()).filter((l) => l && !/★|☆/.test(l))[0] || '';
+  }
+  name = name.replace(/\s*[-–]\s*Google\s*(マップ|Maps)$/i, '').trim();
+  return { name, address, lat, lon, link };
+}
+
+async function geocode(address) {
+  const res = await fetch('https://msearch.gsi.go.jp/address-search/AddressSearch?q=' + encodeURIComponent(address));
+  const j = await res.json();
+  if (!Array.isArray(j) || !j.length) return null;
+  const [lon, lat] = j[0].geometry.coordinates;
+  return { lat, lon };
+}
+
+async function addShared(title, text, url) {
+  const p = parseShared(title, text, url);
+  if (!p.link && !p.address && p.lat == null) return false;
+  let pos = p.lat != null ? { lat: p.lat, lon: p.lon } : null;
+  if (!pos && p.address) {
+    toast('住所から場所を探してるよ…');
+    try { pos = await geocode(p.address); } catch (e) { pos = null; }
+  }
+  const name = prompt(pos
+    ? `Googleマップの店を足すよ。店名を確かめてね。\n（場所：${p.address || '共有されたリンクの場所'}）`
+    : 'Googleマップから場所が読み取れなかった。店名を確かめたら、地図で店の場所をタップしてね。', p.name);
+  if (!name || !name.trim()) return true;
+  if (pos) {
+    addPlace(name.trim(), pos.lat, pos.lon, 'Googleマップから足した店');
+  } else {
+    $('search').value = name.trim();
+    render();
+    setPicking(true);
+  }
+  return true;
+}
+
+// 検索窓に Googleマップの共有を貼ったとき
+$('search').addEventListener('paste', (e) => {
+  const t = e.clipboardData?.getData('text') || '';
+  if (!GMAP_URL_RE.test(t)) return;
+  e.preventDefault();
+  $('search').value = '';
+  render();
+  addShared('', t, '');
+});
 
 $('moreTable').addEventListener('click', (e) => {
   const m = e.target.closest('button[data-more-map]');
@@ -901,6 +982,15 @@ $('search').addEventListener('input', () => {
   $('recSection').hidden = !!norm($('search').value) || (!recShops.length && $('recNote').hidden);
 });
 
+// 「行った」の詳しい画面などで input イベント経由で URL だけが入ったとき（貼り付けを paste で拾えなかった場合）
+$('search').addEventListener('change', () => {
+  const t = $('search').value;
+  if (!GMAP_URL_RE.test(t)) return;
+  $('search').value = '';
+  render();
+  addShared('', t, '');
+});
+
 // ---------- バックアップ ----------
 function backupData() {
   return { app: 'ramen-log', version: 1, exportedAt: new Date().toISOString(), shops: data.shops, visits: data.visits };
@@ -1090,6 +1180,15 @@ addEventListener('appinstalled', () => { $('installCard').hidden = true; });
 // ---------- はじめ ----------
 $('findNearby').addEventListener('click', findNearby);
 render();
+// Googleマップの「共有」から開かれたとき
+{
+  const sp = new URLSearchParams(location.search);
+  if (sp.has('share-title') || sp.has('share-text') || sp.has('share-url')) {
+    const [t, x, u] = ['share-title', 'share-text', 'share-url'].map((k) => sp.get(k) || '');
+    history.replaceState(null, '', location.pathname);
+    setTimeout(() => addShared(t, x, u).then((ok) => { if (!ok) toast('共有された中身に、店の場所が見つからなかった'); }), 300);
+  }
+}
 // インストールできるかの知らせ（beforeinstallprompt）は少し遅れて来るので、待ってから案内を出す
 setTimeout(showInstallCard, 2500);
 
