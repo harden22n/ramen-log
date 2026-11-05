@@ -153,6 +153,11 @@ function renderVisited() {
   $('nearbySection').hidden = !!q;   // 探している間は近くの店をしまって、結果を上に出す
   $('emptyNote').hidden = rows.length > 0;
   $('emptyNote').textContent = q ? 'この名前の店には、まだ行ってないよ。' : 'まだ記録がないよ。お店で「今いる場所から店を探す」を押してね。';
+  // 検索窓のすぐ下に、Googleマップで探すリンク（地図のデータにない店を確かめる用）
+  const word = $('search').value.trim();
+  $('gmapLink').hidden = !q;
+  $('gmapWord').textContent = word;
+  $('gmapLink').href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(word + ' ラーメン')}`;
   renderMore(q, new Set(rows.map((s) => s.id)));
 
   $('visitedTable').tBodies[0].innerHTML = rows.map((s) => {
@@ -203,10 +208,9 @@ async function renderMore(q, shownIds) {
   }).join('');
   $('moreNote').hidden = false;
   $('moreNote').textContent = !total
-    ? (b ? '地図のデータ（OpenStreetMap）に、この名前の店が入ってなかった。下のGoogleマップで場所を確かめて、「地図で場所を選んで店を足す」で入れてね。' : '店リストを読み込めなかった。')
+    ? (b ? '地図のデータ（OpenStreetMap）に、この名前の店が入ってなかった。上の「Googleマップで探す」で場所を確かめて、「地図で場所を選んで店を足す」で入れてね。' : '店リストを読み込めなかった。')
     : (total > MORE_MAX ? `多いので${MORE_MAX}件だけ出してるよ。もう少し詳しく入れてね。` : '') +
       '札幌市内の飲食店と、前に「店を探す」をした場所の店から探してるよ。ない店は下から足せるよ。';
-  $('gmapLink').href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent($('search').value.trim() + ' ラーメン')}`;
 }
 
 // 札幌のラーメン店以外の飲食店（検索だけに使う。地図のタグにラーメンと書かれていない店を拾うため）
