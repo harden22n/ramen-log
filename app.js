@@ -875,6 +875,35 @@ async function liveShops(lat, lon) {
   }
 }
 
+// Google にも近くのラーメン屋を聞く（キーがあるときだけ）。同じあたり（約1km四方）は1週間覚えて聞き直さない
+const NEAR_G_KEY = 'ramenlog.nearGoogle';
+const NEAR_G_DAYS = 7;
+async function googleNearby(lat, lon) {
+  const key = placesKey();
+  if (!key) return [];
+  const cell = `${lat.toFixed(2)},${lon.toFixed(2)}`;
+  let c = {};
+  try { c = JSON.parse(localStorage.getItem(NEAR_G_KEY)) || {}; } catch (e) { /* 空から */ }
+  if (c[cell] && daysSince(c[cell].at) < NEAR_G_DAYS) return c[cell].shops;
+  countPlaces();
+  const res = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': key,
+      'X-Goog-FieldMask': 'places.id,places.displayName,places.location' },
+    body: JSON.stringify({ includedTypes: ['ramen_restaurant'], maxResultCount: 20, rankPreference: 'DISTANCE',
+      languageCode: 'ja', regionCode: 'JP',
+      locationRestriction: { circle: { center: { latitude: lat, longitude: lon }, radius: NEAR_RADIUS } } }),
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(j.error?.message || `HTTP ${res.status}`);
+  const shops = (j.places || []).filter((p) => p.location).map((p) => ({
+    id: 'gplace:' + p.id, name: p.displayName?.text || '（名前なし）', lat: p.location.latitude, lon: p.location.longitude, source: 'google' }));
+  for (const [k, v] of Object.entries(c)) if (daysSince(v.at) >= NEAR_G_DAYS) delete c[k];   // 古いのは捨てる
+  c[cell] = { at: today(), shops };
+  try { localStorage.setItem(NEAR_G_KEY, JSON.stringify(c)); } catch (e) { /* 覚えられなくてもいい */ }
+  return shops;
+}
+
 async function findNearby() {
   const btn = $('findNearby');
   btn.disabled = true;
@@ -884,6 +913,7 @@ async function findNearby() {
     lastPos = pos;
     showHere(pos);
     let osm = [], usedOsm = true;
+    const gWait = googleNearby(pos.lat, pos.lon).catch(() => []);   // 地図の店と同時に聞く
     const b = await loadBundled().catch(() => null);
     if (b && inBox(b.bbox, pos.lat, pos.lon)) {
       osm = b.shops;
@@ -895,6 +925,15 @@ async function findNearby() {
     const map = new Map();
     for (const s of Object.values(data.shops)) if (s.lat != null) map.set(s.id, s);
     for (const s of osm) if (!map.has(s.id)) map.set(s.id, s);
+    // Google の店：地図の店や記録した店と同じ店（すぐそばで、名前の片方がもう片方に入っている）は足さない
+    const known = [...map.values()];
+    for (const g of await gWait) {
+      if (map.has(g.id)) continue;
+      const gn = norm(g.name);
+      if (known.some((s) => distance(s.lat, s.lon, g.lat, g.lon) < SAME_SHOP_M &&
+        (norm(s.name).includes(gn) || gn.includes(norm(s.name))))) continue;
+      map.set(g.id, g);
+    }
     let list = [...map.values()]
       .map((s) => ({ ...s, dist: distance(pos.lat, pos.lon, s.lat, s.lon) }))
       .filter((s) => s.dist <= NEAR_RADIUS);
@@ -963,7 +1002,7 @@ function removeVisit(id) {
   data.visits = data.visits.filter((x) => x.id !== id);
   if (v.photo) delPhoto(id).catch(() => {});
   // 記録が1つもなくなった、地図から来た店は覚えておかなくていい
-  if (!data.visits.some((x) => x.shopId === v.shopId) && data.shops[v.shopId]?.source === 'osm') delete data.shops[v.shopId];
+  if (!data.visits.some((x) => x.shopId === v.shopId) && ['osm', 'google'].includes(data.shops[v.shopId]?.source)) delete data.shops[v.shopId];
   save();
   cloudDel('visit', id);
   render();
