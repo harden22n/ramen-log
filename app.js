@@ -416,11 +416,11 @@ function countPlaces() {
   try { localStorage.setItem(PLACES_COUNT_KEY, JSON.stringify(c)); } catch (e) { /* 数えられなくても止めない */ }
 }
 
-async function placesSearch(query, n = 1) {
+async function placesSearch(query, n = 1, center = null, radius = 50000) {
   const key = placesKey();
   if (!key) return [];
   countPlaces();
-  const near = lastPos || (() => {
+  const near = center || lastPos || (() => {
     const s = myVisits().map((v) => data.shops[v.shopId]).find((x) => x && x.lat != null);
     return s ? { lat: s.lat, lon: s.lon } : { lat: SAPPORO[0], lon: SAPPORO[1] };
   })();
@@ -429,7 +429,7 @@ async function placesSearch(query, n = 1) {
     headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': key,
       'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location' },
     body: JSON.stringify({ textQuery: query, languageCode: 'ja', regionCode: 'JP', maxResultCount: n,
-      locationBias: { circle: { center: { latitude: near.lat, longitude: near.lon }, radius: 50000 } } }),
+      locationBias: { circle: { center: { latitude: near.lat, longitude: near.lon }, radius } } }),
   });
   const j = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(j.error?.message || `HTTP ${res.status}`);
@@ -674,6 +674,32 @@ function tasteScores() {
   return score;
 }
 
+// おすすめ用に Google から取った店。同じ味・同じあたり（約2km四方）は1週間覚えて、そのあいだは聞き直さない
+// （検索の回数を使うのは、知らない場所に行ったときだけ。1日に0〜2回くらい）
+const REC_G_KEY = 'ramenlog.recGoogle';
+const REC_G_DAYS = 7;
+const recGBusy = new Set();
+
+function googleRecs(taste, base) {
+  if (!placesKey()) return [];
+  const k = `${taste}@${Math.round(base.lat * 50) / 50},${Math.round(base.lon * 50) / 50}`;
+  let c = {};
+  try { c = JSON.parse(localStorage.getItem(REC_G_KEY)) || {}; } catch (e) { /* 空から */ }
+  const hit = c[k];
+  if (hit && daysSince(hit.at) < REC_G_DAYS) return hit.shops.map((s) => ({ ...s, gTaste: taste }));
+  if (!recGBusy.has(k) && navigator.onLine !== false) {
+    recGBusy.add(k);
+    const q = /そば|麺/.test(taste) ? taste : `${taste}ラーメン`;
+    placesSearch(q, 20, base, 5000).then((shops) => {
+      for (const [kk, v] of Object.entries(c)) if (daysSince(v.at) >= REC_G_DAYS) delete c[kk];   // 古いのは捨てる
+      c[k] = { at: today(), shops: shops.map(({ id, name, lat, lon }) => ({ id, name, lat, lon })) };
+      try { localStorage.setItem(REC_G_KEY, JSON.stringify(c)); } catch (e) { /* 覚えられなくてもいい */ }
+      renderRecommend();
+    }).catch(() => { /* 回数の上限や電波なし：今ある候補だけで出す */ });
+  }
+  return [];
+}
+
 function daysSince(iso) {
   return Math.round((new Date(today()) - new Date(iso)) / 86400000);
 }
@@ -716,12 +742,16 @@ async function renderRecommend() {
     try {   // 札幌の外で前に調べた店も候補に入れる
       for (const c of Object.values(JSON.parse(localStorage.getItem(LIVE_CACHE_KEY)) || {})) pool.push(...c.shops);
     } catch (e) { /* なくてもいい */ }
+    if (base) pool.push(...googleRecs(liked[0][0], base));   // いちばん好きな味で Google にも聞く（1週間覚える）
+    const visitedShops = mine.map((v) => data.shops[v.shopId]).filter((s) => s && s.lat != null);
     const visitedNames = new Set(mine.map((v) => data.shops[v.shopId]).filter(Boolean).map((s) => norm(s.name)));
     const best = new Map();
     for (const s of pool) {
       if (visitedNames.has(norm(s.name))) continue;   // 同じ名前の店（チェーンの別店舗も）にはもう行っている
-      const ts = tastesOf(s.name).filter((t) => score[t] > 0);
+      // Google の店は、その味で検索して出てきたので、店名に味が入っていなくてもその味の店とみなす
+      const ts = [...new Set([...(s.gTaste ? [s.gTaste] : []), ...tastesOf(s.name)])].filter((t) => score[t] > 0);
       if (!ts.length) continue;
+      if (visitedShops.some((v) => distance(v.lat, v.lon, s.lat, s.lon) < 50)) continue;   // 名前ちがいでも同じ場所なら行った店
       const dist = base ? distance(base.lat, base.lon, s.lat, s.lon) : 0;
       if (base && dist > REC_RANGE_M) continue;
       const pts = ts.reduce((n, t) => n + score[t], 0);
@@ -729,7 +759,11 @@ async function renderRecommend() {
       if (!prev || dist < prev.dist) best.set(norm(s.name), { shop: s, ts, pts, dist });
     }
     // 好みの点数の高い順。2km 離れるごとに1点ずつ下げて、近い店を少し上にする
-    const cands = [...best.values()].sort((a, b) => (b.pts - b.dist / 2000) - (a.pts - a.dist / 2000));
+    const sorted = [...best.values()].sort((a, b) => (b.pts - b.dist / 2000) - (a.pts - a.dist / 2000));
+    const cands = [];   // 地図の店と Google の店で同じ店が2回出ないように、すぐそばの店は1つだけ
+    for (const c of sorted) {
+      if (!cands.some((x) => distance(x.shop.lat, x.shop.lon, c.shop.lat, c.shop.lon) < 60)) cands.push(c);
+    }
     for (const c of cands.slice(0, REC_MAX)) {
       rows.push({ shop: c.shop, visited: false, tag: '未訪問',
         why: `${c.ts.join('・')}が好きそうなので${base ? `・${base.label}から${fmtDist(c.dist)}` : ''}` });
