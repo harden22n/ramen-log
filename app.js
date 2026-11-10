@@ -129,13 +129,71 @@ function render() {
   if (lastNearby) renderNearby(lastNearby);
 }
 
+// ---------- 動き（DESIGN.md「動き」） ----------
+const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;   // 「動きを減らす」の設定
+let statsShown = false;   // 食券の数字を数え上げるのは開いたときの1回だけ
+let justDone = null;      // はんこを押す動きを見せる店
+
+function setStat(id, n) {
+  const el = $(id);
+  el.dataset.n = n;
+  if (statsShown || calm || !n) { el.textContent = n; return; }
+  el.textContent = 0;
+  setTimeout(() => {
+    const t0 = performance.now();
+    const step = (now) => {
+      if (el.dataset.n !== String(n)) return;   // 途中で数が変わったらそちらに任せる
+      const p = Math.min(1, (now - t0) / 700);
+      el.textContent = Math.round(n * (1 - Math.pow(1 - p, 3)));   // だんだんゆっくり止まる
+      if (p < 1) requestAnimationFrame(step); else el.textContent = n;
+    };
+    requestAnimationFrame(step);
+  }, 600);
+}
+
+// 杯数がぴょんと跳ねる（足したときは「+1杯」も浮かぶ）
+function bumpStats(added) {
+  for (const id of ['statYear', 'statMonth']) {
+    const n = $(id);
+    n.classList.remove('bump'); void n.offsetWidth; n.classList.add('bump');
+    if (!added || calm) continue;
+    const p = document.createElement('div');
+    p.className = 'plus'; p.textContent = '+1杯';
+    n.parentElement.appendChild(p);
+    setTimeout(() => p.remove(), 1000);
+  }
+}
+
+// 「行った」を押した所から波紋とナルト、雷紋がひと流れ
+function celebrate(btn) {
+  if (navigator.vibrate) navigator.vibrate([30, 40, 30]);   // スマホが「ココッ」と震える
+  if (calm || !btn) return;
+  const r = btn.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  const w = document.createElement('div');
+  w.className = 'hamon'; w.style.left = cx + 'px'; w.style.top = cy + 'px';
+  document.body.appendChild(w); setTimeout(() => w.remove(), 600);
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2 + Math.random() * .4, d = 60 + Math.random() * 50;
+    const s = document.createElement('div');
+    s.className = 'naruto'; s.textContent = '🍥';
+    s.style.left = (cx - 11) + 'px'; s.style.top = (cy - 11) + 'px';
+    s.style.setProperty('--x', Math.cos(a) * d + 'px');
+    s.style.setProperty('--y', Math.sin(a) * d - 30 + 'px');
+    s.style.setProperty('--r', (Math.random() * 540 - 270) + 'deg');
+    document.body.appendChild(s); setTimeout(() => s.remove(), 900);
+  }
+  const rai = $('raimon');
+  rai.classList.remove('flash'); void rai.offsetWidth; rai.classList.add('flash');
+}
+
 function renderStats() {
   const y = String(new Date().getFullYear());
   const ym = today().slice(0, 7);
   const vs = shownVisits();
-  $('statYear').textContent = vs.filter((v) => v.date.startsWith(y)).length;
-  $('statMonth').textContent = vs.filter((v) => v.date.startsWith(ym)).length;
-  $('statShops').textContent = new Set(vs.map((v) => v.shopId)).size;
+  setStat('statYear', vs.filter((v) => v.date.startsWith(y)).length);
+  setStat('statMonth', vs.filter((v) => v.date.startsWith(ym)).length);
+  setStat('statShops', new Set(vs.map((v) => v.shopId)).size);
+  statsShown = true;
   $('viewSwitch').hidden = !window.cloud;
   for (const b of $('viewSwitch').children) b.classList.toggle('on', (b.dataset.view === 'me') === viewMine);
 }
@@ -264,7 +322,7 @@ $('gTable').addEventListener('click', (e) => {
   const g = gShops[Number((m || go)?.dataset.gMap ?? (m || go)?.dataset.gGo)];
   if (!g) return;
   if (m) { showOnMap(g, g.address || 'Googleで見つけた店'); return; }
-  addVisit(addGooglePlace(g));
+  addVisit(addGooglePlace(g), go);
 });
 
 // 探しているとき：行ってない店も、地図の店リスト（札幌＋前に調べた場所）と手で足した店から出す
@@ -542,7 +600,7 @@ $('moreTable').addEventListener('click', (e) => {
   if (!s) return;
   if (m) { showOnMap(s, 'まだ行ってない店'); return; }
   const { dist, ...shop } = s;
-  addVisit(shop);
+  addVisit(shop, g);
 });
 
 // 検索語に当たった部分に色をつける（表記ゆれをそろえた上で位置を探す）
@@ -637,7 +695,7 @@ function renderMap() {
 function showHere(pos) {
   if (!map) return;
   if (hereLayer) hereLayer.remove();
-  hereLayer = L.circleMarker([pos.lat, pos.lon], { radius: 7, color: '#fff', weight: 2, fillColor: '#2b2420' /* --sumi（今いる場所） */, fillOpacity: 1 })
+  hereLayer = L.circleMarker([pos.lat, pos.lon], { radius: 7, color: '#fff', weight: 2, fillColor: '#1d1a17' /* --sumi（今いる場所） */, fillOpacity: 1 })
     .bindTooltip('今いる場所').addTo(map);
 }
 
@@ -976,12 +1034,14 @@ function renderNearby({ shops }) {
     const doneToday = vs.some((v) => v.date === t);
     const info = [fmtDist(s.dist), vs.length ? `${vs.length}回` : '未訪問', s.source === 'manual' ? '手で追加' : ''].filter(Boolean).join('・');
     return `<tr><td>${esc(s.name)} <span class="dist">${info}</span></td>
-      <td class="r"><button class="go${doneToday ? ' done' : ''}" data-near="${esc(s.id)}">${doneToday ? '記録済み' : '行った'}</button></td></tr>`;
+      <td class="r">${doneToday ? `<span class="hanko${justDone === s.id ? ' new' : ''}" aria-hidden="true">済</span>` : ''}<button class="go${doneToday ? ' done' : ''}" data-near="${esc(s.id)}">${doneToday ? '記録済み' : '行った'}</button></td></tr>`;
   }).join('');
 }
 
 // ---------- 記録する ----------
-function addVisit(shop) {
+let openLater = null;
+// fromBtn：押した「行った」ボタン（あれば動きを見せてから入力画面を出す）
+function addVisit(shop, fromBtn) {
   if (!data.shops[shop.id]) {
     data.shops[shop.id] = { id: shop.id, name: shop.name, lat: shop.lat ?? null, lon: shop.lon ?? null, source: shop.source };
   }
@@ -991,9 +1051,15 @@ function addVisit(shop) {
   save();
   cloudPut('shop', data.shops[shop.id]);
   cloudPut('visit', v);
+  if (fromBtn) celebrate(fromBtn);   // 表が描き直される前に、ボタンの場所を使う
+  justDone = shop.id;
   render();
+  justDone = null;
+  bumpStats(true);
   // 記録はもう済んでいる。続けて頼んだもの・★・写真を入れる画面を出す（「あとで」で閉じてもいい）
-  openVisit(v.id, true);
+  clearTimeout(openLater);
+  if (fromBtn && !calm) openLater = setTimeout(() => openVisit(v.id, true), 800);   // 動きを見せてから
+  else openVisit(v.id, true);
 }
 
 function removeVisit(id) {
@@ -1013,8 +1079,21 @@ $('nearbyTable').addEventListener('click', (e) => {
   if (!btn || !lastNearby) return;
   const shop = lastNearby.shops.find((s) => s.id === btn.dataset.near);
   if (!shop) return;
-  if (btn.classList.contains('done') && !confirm(`${shop.name} は今日もう記録してあるよ。もう1杯として足す？`)) return;
-  addVisit(shop);
+  if (btn.classList.contains('done')) {
+    // 「記録済み」をもう一度タップ → 押し間違いとして取り消す（2杯目は店の詳細の「今日も行った」から）
+    const mine = data.visits.filter((v) => v.shopId === shop.id && v.date === today() && isMine(v)).pop();
+    if (mine) {
+      const filled = mine.menu || mine.star || mine.memo || mine.photo;
+      if (filled && !confirm(`${shop.name} の今日の記録には、頼んだもの・★などが入ってるよ。取り消す？`)) return;
+      clearTimeout(openLater);
+      removeVisit(mine.id);
+      bumpStats(false);
+      if (navigator.vibrate) navigator.vibrate(15);
+      toast(`${shop.name} の記録を取り消した`);
+      return;
+    }
+  }
+  addVisit(shop, btn);
 });
 
 // 地図にない店を足す

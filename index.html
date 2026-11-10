@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#1f3a5f">
+  <meta name="theme-color" content="#16263f">
   <meta name="description" content="行ったラーメン屋を、店名ですぐ引ける記録帳">
   <title>拉麺帖</title>
   <link rel="manifest" href="manifest.webmanifest?v=4">
@@ -11,13 +11,18 @@
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="vendor/markercluster/MarkerCluster.css">
+  <!-- 看板の字と数字だけ太いゴシック（Dela Gothic One）。使う字だけ読むので軽い。電波がないときはふつうの太字になる -->
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&text=%E6%8B%89%E9%BA%BA%E5%B8%960123456789%E5%9B%9E%E6%9D%AF%E8%BB%92&display=swap">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="noren">
+  <header class="kanban">
+    <svg class="yuge" viewBox="0 0 110 120" aria-hidden="true"><path d="M30 120c-10-20 10-30 0-50s10-30 0-50"/><path d="M58 120c-10-20 10-30 0-50s10-30 0-50"/><path d="M86 120c-10-20 10-30 0-50s10-30 0-50"/></svg>
     <h1>拉麺帖</h1>
-    <p>行った店を、店名ですぐ引ける</p>
+    <p>札幌らーめん</p>
   </header>
+  <div id="raimon" class="raimon" aria-hidden="true"></div>
 
   <main class="wrap">
     <!-- ホーム画面に置くための案内（ホーム画面から開いたときは出さない） -->
@@ -32,9 +37,9 @@
 
     <div id="viewSwitch" class="seg" hidden><button type="button" data-view="all">みんなの記録</button><button type="button" data-view="me">自分の記録</button></div>
     <div class="stats">
-      <div class="s"><b id="statYear">0</b>今年の杯数</div>
-      <div class="s"><b id="statShops">0</b>行った店</div>
-      <div class="s"><b id="statMonth">0</b>今月</div>
+      <div class="s"><span>今年</span><b id="statYear">0</b><small>杯</small></div>
+      <div class="s"><span>行った店</span><b id="statShops">0</b><small>軒</small></div>
+      <div class="s"><span>今月</span><b id="statMonth">0</b><small>杯</small></div>
     </div>
 
     <input id="search" class="search" type="search" placeholder="店名で探す" autocomplete="off" enterkeyhint="search">
@@ -48,7 +53,7 @@
 
     <section id="nearbySection">
       <h2>近くの店</h2>
-      <button id="findNearby" class="wide">📍 今いる場所から店を探す</button>
+      <button id="findNearby" class="wide go">📍 今いる場所から店を探す</button>
       <p id="nearbyStatus" class="note" hidden></p>
       <table id="nearbyTable" hidden><tbody></tbody></table>
       <button id="addManual" class="link" hidden>＋ 地図にない店を足す</button>

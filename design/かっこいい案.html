@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>拉麺帖 かっこいい案</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- 看板の字（拉麺帖）と数字だけ太いゴシック。text= で使う字だけ読み込むので軽い -->
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&text=拉麺帖0123456789回杯軒&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ai:#16263f;   /* 看板の紺（今より深く） */
+    --shu:#d23a2a;  /* 朱：雷紋とボタン */
+    --hai:#efede8;  /* 背景：白磁の丼まわりの灰白 */
+    --sumi:#1d1a17;
+    --usu:#6f665c;
+    --sen:#e4e0d8;
+    --kan:"Dela Gothic One",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--hai);color:var(--sumi);font-family:system-ui,"Yu Gothic","Hiragino Sans",sans-serif}
+
+  /* 看板：深い紺に太い字。下に丼のふちの雷紋 */
+  .kanban{background:var(--ai);color:#fff;padding:22px 16px 18px;display:flex;align-items:flex-end;justify-content:space-between}
+  .kanban h1{margin:0;font-family:var(--kan);font-weight:400;font-size:44px;line-height:1;letter-spacing:.06em}
+  .kanban p{margin:0 0 4px;font-size:12px;opacity:.75;writing-mode:vertical-rl;letter-spacing:.2em;height:7.5em}
+  .raimon{height:16px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M1 15V1h14v11H4V4h8v5H7' fill='none' stroke='%23d23a2a' stroke-width='2'/%3E%3C/svg%3E") repeat-x left center;border-bottom:2px solid var(--ai)}
+
+  .wrap{max-width:420px;margin:0 auto;padding:18px 14px 40px}
+
+  /* 数字は食券の形 */
+  .tickets{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+  .t{background:#fff;border-radius:6px;overflow:hidden;text-align:center;position:relative;
+     -webkit-mask:radial-gradient(circle 5px at 0 62%,#0000 98%,#000) left/51% 100% no-repeat,radial-gradient(circle 5px at 100% 62%,#0000 98%,#000) right/51% 100% no-repeat;
+     mask:radial-gradient(circle 5px at 0 62%,#0000 98%,#000) left/51% 100% no-repeat,radial-gradient(circle 5px at 100% 62%,#0000 98%,#000) right/51% 100% no-repeat}
+  .t span{display:block;background:var(--ai);color:#fff;font-size:11px;padding:4px 0;letter-spacing:.1em}
+  .t b{display:block;font-family:var(--kan);font-weight:400;font-size:30px;line-height:1;padding:10px 0 2px;color:var(--ai)}
+  .t small{display:block;font-size:11px;color:var(--usu);padding-bottom:9px;border-top:1px dashed var(--sen);margin:6px 10px 0;padding-top:4px}
+
+  .search{width:100%;padding:12px 14px;font-size:16px;border:2px solid var(--ai);border-radius:6px;background:#fff;color:var(--sumi)}
+  .main{width:100%;margin-top:10px;padding:14px;font-size:16px;font-weight:700;background:var(--shu);color:#fff;border:none;border-radius:6px;letter-spacing:.05em}
+
+  h2{font-size:15px;font-weight:800;margin:24px 0 8px;display:flex;align-items:center;gap:8px}
+  h2::before{content:"";width:14px;height:14px;background:var(--shu);border-radius:50%}  /* なるとじゃなく、朱の丸印 */
+  h2 small{font-weight:400;font-size:12px;color:var(--usu);margin-left:auto}
+
+  .list{background:#fff;border-radius:6px;border-top:3px solid var(--ai)}
+  .row{display:flex;align-items:center;gap:10px;padding:12px;border-bottom:1px solid var(--sen)}
+  .row:last-child{border-bottom:none}
+  .name{flex:1;min-width:0}
+  .name b{display:block;font-size:16px}
+  .name span{font-size:12px;color:var(--usu)}
+  .count{font-family:var(--kan);font-size:24px;color:var(--ai);white-space:nowrap}
+  .count i{font-style:normal;font-size:12px;margin-left:2px}
+  .go{background:var(--shu);color:#fff;border:none;border-radius:4px;padding:9px 14px;font-size:14px;font-weight:700;min-height:36px}
+  .name .star{color:var(--shu)}
+
+  /* ── 動き ── */
+  /* ①開いたとき1回だけ：のれんが下りて、雷紋が横に流れ込み、食券の数字が数え上がる */
+  .kanban{transform-origin:top;animation:noren .7s cubic-bezier(.2,.9,.3,1.2) both}
+  @keyframes noren{from{transform:translateY(-100%)}to{transform:none}}
+  .kanban h1{animation:fadeup .5s .45s ease-out both}
+  @keyframes fadeup{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .raimon{animation:rai 1s .3s ease-out both}
+  @keyframes rai{from{background-position:-400px center;clip-path:inset(0 100% 0 0)}to{background-position:0 center;clip-path:inset(0 0 0 0)}}
+  .t{animation:ticket .45s ease-out both}
+  .t:nth-child(1){animation-delay:.55s}.t:nth-child(2){animation-delay:.65s}.t:nth-child(3){animation-delay:.75s}
+  @keyframes ticket{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:none}}
+
+  /* ②「行った」を押したとき：朱のはんこがドンと押され、今年の杯数が1つ増えて跳ねる */
+  .row{position:relative}
+  .go.done{background:#fff;color:var(--shu);box-shadow:inset 0 0 0 2px var(--shu)}
+  .hanko{position:absolute;right:76px;top:50%;width:46px;height:46px;margin-top:-23px;border:3px solid var(--shu);border-radius:50%;
+    color:var(--shu);font-weight:900;font-size:15px;display:flex;align-items:center;justify-content:center;pointer-events:none;
+    animation:hanko .45s cubic-bezier(.3,1.6,.5,1) both}
+  @keyframes hanko{from{opacity:0;transform:scale(2.2) rotate(-25deg)}to{opacity:.9;transform:scale(1) rotate(-12deg)}}
+  .hanko.off{animation:hankoOff .25s ease-in both}
+  @keyframes hankoOff{from{opacity:.9;transform:scale(1) rotate(-12deg)}to{opacity:0;transform:scale(.6) rotate(-12deg)}}
+  .bump{animation:bump .5s cubic-bezier(.3,1.8,.5,1)}
+  @keyframes bump{0%{transform:scale(1)}40%{transform:scale(1.35);color:var(--shu)}100%{transform:scale(1)}}
+
+  /* ③湯気：看板からずっとゆらゆら立ちのぼる（形と透明度だけ動かすので軽い） */
+  .kanban{position:relative;overflow:hidden}
+  .yuge{position:absolute;left:120px;bottom:0;width:110px;height:100%;pointer-events:none}
+  .yuge path{fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;opacity:0;animation:yuge 3.6s ease-in-out infinite}
+  .yuge path:nth-child(2){animation-delay:1.2s}.yuge path:nth-child(3){animation-delay:2.4s}
+  @keyframes yuge{0%{opacity:0;transform:translateY(30px) scaleY(.6)}30%{opacity:.35}100%{opacity:0;transform:translateY(-40px) scaleY(1.2)}}
+
+  /* ④「行った」をもっと派手に：波紋＋ナルトが飛び散る＋「+1杯」が浮かぶ＋雷紋がひと流れ */
+  .hamon{position:absolute;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;border:3px solid var(--shu);pointer-events:none;animation:hamon .6s ease-out both}
+  @keyframes hamon{from{transform:scale(.5);opacity:1}to{transform:scale(7);opacity:0}}
+  .naruto{position:fixed;font-size:22px;pointer-events:none;z-index:9;animation:naruto .9s cubic-bezier(.2,.7,.4,1) both}
+  @keyframes naruto{from{transform:translate(0,0) rotate(0) scale(.4);opacity:1}
+    to{transform:translate(var(--x),var(--y)) rotate(var(--r)) scale(1);opacity:0}}
+  .plus{position:absolute;left:0;right:0;top:34px;font-family:var(--kan);color:var(--shu);font-size:18px;pointer-events:none;animation:plus 1s ease-out both}
+  @keyframes plus{from{opacity:0;transform:translateY(0)}20%{opacity:1}to{opacity:0;transform:translateY(-34px)}}
+  .raimon.flash{animation:flash .7s linear}
+  @keyframes flash{from{background-position:0 center}to{background-position:64px center;background-color:#ffe9e4}}
+
+  /* 動きを減らす設定のスマホでは動かさない */
+  @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style></head><body>
+  <header class="kanban"><svg class="yuge" viewBox="0 0 110 120" aria-hidden="true"><path d="M30 120c-10-20 10-30 0-50s10-30 0-50"/><path d="M58 120c-10-20 10-30 0-50s10-30 0-50"/><path d="M86 120c-10-20 10-30 0-50s10-30 0-50"/></svg><h1>拉麺帖</h1><p>札幌らーめん</p></header>
+  <div class="raimon"></div>
+  <div class="wrap">
+    <div class="tickets">
+      <div class="t"><span>今年</span><b>24</b><small>杯</small></div>
+      <div class="t"><span>行った店</span><b>11</b><small>軒</small></div>
+      <div class="t"><span>今月</span><b>3</b><small>杯</small></div>
+    </div>
+    <input class="search" placeholder="店名で探す">
+    <button class="main">今いる場所から店を探す</button>
+
+    <h2>近くの店</h2>
+    <div class="list">
+      <div class="row"><div class="name"><b>麺屋 さくら</b><span>50m・3回</span></div><button class="go">行った</button></div>
+      <div class="row"><div class="name"><b>らーめん 北斗</b><span>120m・1回</span></div><button class="go">行った</button></div>
+      <div class="row"><div class="name"><b>味噌の大将</b><span>300m・まだ行ってない</span></div><button class="go">行った</button></div>
+    </div>
+
+    <h2>行った店<small>回数順</small></h2>
+    <div class="list">
+      <div class="row"><div class="name"><b>麺屋 さくら</b><span>10/28 味噌チャーシュー <span class="star">★★★★</span></span></div><div class="count">3<i>回</i></div></div>
+      <div class="row"><div class="name"><b>味噌の大将</b><span>9/30 辛味噌 <span class="star">★★★★★</span></span></div><div class="count">2<i>回</i></div></div>
+      <div class="row"><div class="name"><b>らーめん 北斗</b><span>10/12 醤油 <span class="star">★★★</span></span></div><div class="count">1<i>回</i></div></div>
+      <div class="row"><div class="name"><b>中華そば 白石</b><span>9/14</span></div><div class="count">1<i>回</i></div></div>
+    </div>
+  </div>
+<script>
+  const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // 食券の数字を0から数え上げる（最初の1回だけ）
+  document.querySelectorAll('.t b').forEach((b, i) => {
+    const to = +b.textContent; if (calm) return;
+    b.textContent = 0;
+    setTimeout(() => {
+      const t0 = performance.now(), dur = 700;
+      const step = (now) => {
+        const p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 3); // だんだんゆっくり止まる
+        b.textContent = Math.round(to * e);
+        if (p < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    }, 600 + i * 100);
+  });
+  // 「行った」で、はんこ＋杯数が増える
+  document.querySelectorAll('.go').forEach((btn) => btn.addEventListener('click', () => {
+    if (btn.classList.contains('done')) {
+      // もう一度タップしたら取り消し：はんこが消え、杯数も1つ戻る
+      btn.classList.remove('done'); btn.textContent = '行った';
+      const old = btn.closest('.row').querySelector('.hanko');
+      if (old) { old.classList.add('off'); setTimeout(() => old.remove(), 250); }
+      [0, 2].forEach((k) => {
+        const n = document.querySelectorAll('.t b')[k];
+        n.textContent = +n.textContent - 1;
+        n.classList.remove('bump'); void n.offsetWidth; n.classList.add('bump');
+      });
+      if (navigator.vibrate) navigator.vibrate(15);
+      return;
+    }
+    btn.classList.add('done'); btn.textContent = '記録済';
+    const h = document.createElement('div'); h.className = 'hanko'; h.textContent = '済';
+    btn.closest('.row').appendChild(h);
+    if (navigator.vibrate) navigator.vibrate([30, 40, 30]); // スマホが「ココッ」と小さく震える
+    [0, 2].forEach((k) => {
+      const n = document.querySelectorAll('.t b')[k];
+      n.textContent = +n.textContent + 1;
+      n.classList.remove('bump'); void n.offsetWidth; n.classList.add('bump');
+      const p = document.createElement('div'); p.className = 'plus'; p.textContent = '+1杯';
+      n.parentElement.appendChild(p); setTimeout(() => p.remove(), 1000);
+    });
+    if (calm) return;
+    // 押した所から波紋
+    const row = btn.closest('.row'), rr = row.getBoundingClientRect(), br = btn.getBoundingClientRect();
+    const w = document.createElement('div'); w.className = 'hamon';
+    w.style.left = (br.left - rr.left + br.width / 2) + 'px'; w.style.top = (br.top - rr.top + br.height / 2) + 'px';
+    row.appendChild(w); setTimeout(() => w.remove(), 600);
+    // ナルトが8個飛び散る
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + Math.random() * .4, d = 60 + Math.random() * 50;
+      const s = document.createElement('div'); s.className = 'naruto'; s.textContent = '🍥';
+      s.style.left = (br.left + br.width / 2 - 11) + 'px'; s.style.top = (br.top + br.height / 2 - 11) + 'px';
+      s.style.setProperty('--x', Math.cos(a) * d + 'px'); s.style.setProperty('--y', Math.sin(a) * d - 30 + 'px');
+      s.style.setProperty('--r', (Math.random() * 540 - 270) + 'deg');
+      document.body.appendChild(s); setTimeout(() => s.remove(), 900);
+    }
+    // 雷紋がひと流れ
+    const rai = document.querySelector('.raimon');
+    rai.classList.remove('flash'); void rai.offsetWidth; rai.classList.add('flash');
+  }));
+</script>
+</body></html>

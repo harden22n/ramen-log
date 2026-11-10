@@ -1,14 +1,15 @@
-/* 色やかたちは design/決定.html（案C）に合わせている */
+/* 見た目のきまりは DESIGN.md。色は下の変数だけを使う */
 :root {
-  --ai: #1f3a5f;      /* のれんの紺 */
-  --aka: #c0392b;     /* 赤（数字・ボタン） */
-  --kami: #f4efe6;    /* 背景の紙色 */
-  --sumi: #2b2420;    /* 文字 */
-  --usu: #7a6a5a;     /* うすい文字 */
-  --sen: #eee4d4;     /* 表の線 */
-  --waku: #cdbfa8;    /* 入力欄のふち */
-  --ho: #9a8a7a;      /* 小さい補足の文字 */
+  --ai: #16263f;      /* 看板の紺 */
+  --aka: #d23a2a;     /* 朱（雷紋・押してほしいボタン・★） */
+  --kami: #efede8;    /* 背景：どんぶりまわりの灰白 */
+  --sumi: #1d1a17;    /* 文字 */
+  --usu: #6f665c;     /* うすい文字 */
+  --sen: #e4e0d8;     /* 表の線 */
+  --waku: #cdc6b8;    /* 入力欄のふち */
+  --ho: #948a7e;      /* 小さい補足の文字 */
   --kin: #d4a017;     /* おすすめの目印（地図の☆だけ） */
+  --kan: "Dela Gothic One", system-ui, sans-serif;  /* 看板の字と数字 */
 }
 
 * { box-sizing: border-box; }
@@ -20,30 +21,34 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-.noren {
+/* 看板（いちばん上）：深い紺に極太の字、右に縦書きの札、湯気 */
+.kanban {
   background: var(--ai);
   color: #fff;
-  padding: calc(14px + env(safe-area-inset-top)) 16px 18px;
-  position: relative;
+  padding: calc(22px + env(safe-area-inset-top)) 16px 18px;
+  display: flex; align-items: flex-end; justify-content: space-between;
+  position: relative; overflow: hidden;
 }
-.noren h1 {
-  margin: 0;
-  font-size: 22px;
-  letter-spacing: .2em;
-  font-family: "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif JP", serif;
-}
-.noren p { margin: 4px 0 0; font-size: 12px; opacity: .8; }
-.noren::after {
-  content: "";
-  position: absolute; left: 0; right: 0; bottom: -8px; height: 8px;
-  background: repeating-linear-gradient(90deg, var(--ai) 0 22%, transparent 22% 25%);
+.kanban h1 { margin: 0; font-family: var(--kan); font-weight: 400; font-size: 44px; line-height: 1; letter-spacing: .06em; }
+.kanban p { margin: 0 0 4px; font-size: 12px; opacity: .75; writing-mode: vertical-rl; letter-spacing: .2em; }
+.yuge { position: absolute; left: 120px; bottom: 0; width: 110px; height: 100%; pointer-events: none; }
+.yuge path { fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; opacity: 0; }
+/* 看板の下：どんぶりのふちの雷紋 */
+.raimon {
+  height: 16px; border-bottom: 2px solid var(--ai);
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='M1 15V1h14v11H4V4h8v5H7' fill='none' stroke='%23d23a2a' stroke-width='2'/%3E%3C/svg%3E") repeat-x left center;
 }
 
 .wrap { max-width: 420px; margin: 0 auto; padding: 20px 14px 80px; }
 
-.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
-.s { background: #fff; border-radius: 6px; padding: 8px; text-align: center; font-size: 11px; color: var(--usu); }
-.s b { display: block; font-size: 20px; color: var(--aka); }
+/* 数字は食券の形（上に紺の帯、横に切り込み） */
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+.s { background: #fff; border-radius: 6px; text-align: center; position: relative;
+  -webkit-mask: radial-gradient(circle 5px at 0 62%, #0000 98%, #000) left / 51% 100% no-repeat, radial-gradient(circle 5px at 100% 62%, #0000 98%, #000) right / 51% 100% no-repeat;
+  mask: radial-gradient(circle 5px at 0 62%, #0000 98%, #000) left / 51% 100% no-repeat, radial-gradient(circle 5px at 100% 62%, #0000 98%, #000) right / 51% 100% no-repeat; }
+.s span { display: block; background: var(--ai); color: #fff; font-size: 11px; padding: 4px 0; letter-spacing: .1em; border-radius: 6px 6px 0 0; }
+.s b { display: block; font-family: var(--kan); font-weight: 400; font-size: 30px; line-height: 1; padding: 10px 0 2px; color: var(--ai); }
+.s small { display: block; font-size: 11px; color: var(--usu); border-top: 1px dashed var(--sen); margin: 6px 10px 0; padding: 4px 0 9px; }
 
 .search, .dlg input, .dlg select, .dlg textarea {
   width: 100%;
@@ -55,17 +60,23 @@ body {
   color: var(--sumi);
   font-family: inherit;
 }
+.search { border: 2px solid var(--ai); padding: 11px 14px; }
 
-h2 { font-size: 12px; color: var(--usu); margin: 18px 0 6px; border-left: 3px solid var(--aka); padding-left: 6px; }
+/* 小見出し：太字に朱の丸印 */
+h2 { font-size: 15px; font-weight: 800; color: var(--sumi); margin: 24px 0 8px; display: flex; align-items: center; gap: 8px; }
+h2::before { content: ""; flex: none; width: 14px; height: 14px; background: var(--aka); border-radius: 50%; }
 
-table { width: 100%; border-collapse: collapse; background: #fff; font-size: 14px; }
-td { padding: 10px 6px; border-bottom: 1px solid var(--sen); vertical-align: middle; }
+/* 一覧：白地、上に紺の線。店名は太字 */
+table { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; font-size: 15px; border-top: 3px solid var(--ai); border-radius: 6px; }
+td { padding: 12px 10px; border-bottom: 1px solid var(--sen); vertical-align: middle; font-weight: 700; }
+tr:last-child td { border-bottom: none; }
+td .dist, td button, td .tag { font-weight: 400; }
 td.r { text-align: right; white-space: nowrap; width: 1%; }
 tr.tap { cursor: pointer; }
 tr.tap:active { background: var(--kami); }
 
-.dist { color: var(--ho); font-size: 11px; }
-.num { text-align: right; color: var(--aka); font-weight: 700; white-space: nowrap; }
+.dist { color: var(--usu); font-size: 12px; }
+.num { text-align: right; color: var(--ai); font-family: var(--kan); font-weight: 400; font-size: 22px; white-space: nowrap; }
 .note { font-size: 12px; color: var(--usu); margin: 6px 0; line-height: 1.6; }
 .install { background: #fff; border: 1px solid var(--ai); border-radius: 6px; padding: 10px 12px; margin-bottom: 14px; }
 .install p { margin: 0; font-size: 13px; line-height: 1.6; }
@@ -76,13 +87,14 @@ a.btn { text-decoration: none; text-align: center; flex: 1; display: inline-flex
 mark {background: var(--sen); color: inherit; font-weight: 700; }
 
 button { font-family: inherit; cursor: pointer; }
-.go { background: var(--aka); color: #fff; border: none; border-radius: 4px; padding: 8px 12px; font-size: 14px; }
+.go { background: var(--aka); color: #fff; border: none; border-radius: 4px; padding: 8px 12px; font-size: 14px; font-weight: 700; }
+td button.go { font-weight: 700; }
 .go:active { opacity: .8; }
-.go.done { background: var(--ho); }
+.go.done { background: #fff; color: var(--aka); box-shadow: inset 0 0 0 2px var(--aka); }
 .go, .sub, .danger { min-height: 36px; } /* 指で押しやすい高さ */
 .sub { background: #fff; color: var(--ai); border: 1px solid var(--ai); border-radius: 4px; padding: 8px 12px; font-size: 14px; }
 .danger { background: #fff; color: var(--aka); border: 1px solid var(--aka); border-radius: 4px; padding: 8px 12px; font-size: 14px; }
-.wide { width: 100%; padding: 12px; font-size: 15px; background: var(--ai); color: #fff; border: none; border-radius: 6px; }
+.wide { width: 100%; padding: 14px; font-size: 16px; font-weight: 700; letter-spacing: .05em; background: var(--ai); color: #fff; border: none; border-radius: 6px; }
 .wide.go { background: var(--aka); }
 .wide:disabled { opacity: .6; }
 .link { background: none; border: none; color: var(--ai); font-size: 13px; padding: 10px 0; text-decoration: underline; }
@@ -100,7 +112,7 @@ dialog::backdrop { background: rgba(20, 20, 30, .45); }
 .dlg { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 .dlg label { font-size: 12px; color: var(--usu); display: flex; flex-direction: column; gap: 4px; }
 .dlg-head { display: flex; align-items: center; gap: 8px; border-bottom: 2px solid var(--ai); padding-bottom: 6px; }
-.dlg-head h3 { flex: 1; margin: 0; font-size: 18px; font-family: "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif JP", serif; word-break: break-all; }
+.dlg-head h3 { flex: 1; margin: 0; font-size: 18px; font-weight: 800; word-break: break-all; }
 .x { background: none; border: none; font-size: 22px; min-width: 36px; min-height: 36px; line-height: 1; color: var(--usu); padding: 0 4px; }
 
 .field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--usu); }
@@ -178,3 +190,39 @@ button.gmap { width: 100%; text-align: left; font-family: inherit; }
 .seg[hidden] { display: none; }
 /* 地図のまとまり（近くの店をまとめた丸） */
 .pin.cluster { background: #fff; color: var(--ai); border: 3px solid var(--ai); font-size: 11px; }
+
+/* ── 動き（DESIGN.md「動き」）── */
+/* ①開いたとき1回だけ：看板が下りて、雷紋が流れ込み、食券が落ちてくる（数字の数え上げは app.js） */
+.kanban { animation: noren .7s cubic-bezier(.2, .9, .3, 1.2) both; }
+@keyframes noren { from { transform: translateY(-100%); } to { transform: none; } }
+.kanban h1 { animation: fadeup .5s .45s ease-out both; }
+@keyframes fadeup { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.raimon { animation: rai 1s .3s ease-out both; }
+@keyframes rai { from { background-position: -400px center; clip-path: inset(0 100% 0 0); } to { background-position: 0 center; clip-path: inset(0 0 0 0); } }
+.s { animation: ticket .45s ease-out both; }
+.s:nth-child(1) { animation-delay: .55s; } .s:nth-child(2) { animation-delay: .65s; } .s:nth-child(3) { animation-delay: .75s; }
+@keyframes ticket { from { opacity: 0; transform: translateY(-14px); } to { opacity: 1; transform: none; } }
+/* ②湯気：ずっとゆらゆら（形と透明度だけなので軽い） */
+.yuge path { animation: yuge 3.6s ease-in-out infinite; }
+.yuge path:nth-child(2) { animation-delay: 1.2s; } .yuge path:nth-child(3) { animation-delay: 2.4s; }
+@keyframes yuge { 0% { opacity: 0; transform: translateY(30px) scaleY(.6); } 30% { opacity: .35; } 100% { opacity: 0; transform: translateY(-40px) scaleY(1.2); } }
+/* ③「行った」：はんこ・波紋・ナルト・+1杯・雷紋がひと流れ */
+.hanko { display: inline-flex; vertical-align: middle; align-items: center; justify-content: center; width: 36px; height: 36px; margin-right: 6px;
+  border: 3px solid var(--aka); border-radius: 50%; color: var(--aka); font-weight: 900; font-size: 13px; transform: rotate(-12deg); opacity: .9; }
+.hanko.new { animation: hanko .45s cubic-bezier(.3, 1.6, .5, 1) both; }
+@keyframes hanko { from { opacity: 0; transform: scale(2.2) rotate(-25deg); } to { opacity: .9; transform: scale(1) rotate(-12deg); } }
+.bump { animation: bump .5s cubic-bezier(.3, 1.8, .5, 1); }
+@keyframes bump { 0% { transform: scale(1); } 40% { transform: scale(1.35); color: var(--aka); } 100% { transform: scale(1); } }
+.plus { position: absolute; left: 0; right: 0; top: 34px; font-family: var(--kan); color: var(--aka); font-size: 18px; pointer-events: none; animation: plus 1s ease-out both; }
+@keyframes plus { from { opacity: 0; transform: translateY(0); } 20% { opacity: 1; } to { opacity: 0; transform: translateY(-34px); } }
+.hamon { position: fixed; z-index: 9; width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%; border: 3px solid var(--aka); pointer-events: none; animation: hamon .6s ease-out both; }
+@keyframes hamon { from { transform: scale(.5); opacity: 1; } to { transform: scale(7); opacity: 0; } }
+.naruto { position: fixed; z-index: 9; font-size: 22px; pointer-events: none; animation: naruto .9s cubic-bezier(.2, .7, .4, 1) both; }
+@keyframes naruto { from { transform: translate(0, 0) rotate(0) scale(.4); opacity: 1; } to { transform: translate(var(--x), var(--y)) rotate(var(--r)) scale(1); opacity: 0; } }
+.raimon.flash { animation: flash .7s linear; }
+@keyframes flash { from { background-position: 0 center; } to { background-position: 64px center; background-color: #ffe9e4; } }
+/* スマホで「動きを減らす」にしている人には動かさない */
+@media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; } .yuge { display: none; } }
+
+/* 「今いる場所から店を探す」と近くの店の表のすき間 */
+#nearbyTable { margin-top: 10px; }
