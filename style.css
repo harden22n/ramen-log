@@ -7,6 +7,8 @@
   --usu: #7a6a5a;     /* うすい文字 */
   --sen: #eee4d4;     /* 表の線 */
   --waku: #cdbfa8;    /* 入力欄のふち */
+  --ho: #9a8a7a;      /* 小さい補足の文字 */
+  --kin: #d4a017;     /* おすすめの目印（地図の☆だけ） */
 }
 
 * { box-sizing: border-box; }
@@ -60,23 +62,24 @@ table { width: 100%; border-collapse: collapse; background: #fff; font-size: 14p
 td { padding: 10px 6px; border-bottom: 1px solid var(--sen); vertical-align: middle; }
 td.r { text-align: right; white-space: nowrap; width: 1%; }
 tr.tap { cursor: pointer; }
-tr.tap:active { background: #faf5ec; }
+tr.tap:active { background: var(--kami); }
 
-.dist { color: #9a8a7a; font-size: 11px; }
+.dist { color: var(--ho); font-size: 11px; }
 .num { text-align: right; color: var(--aka); font-weight: 700; white-space: nowrap; }
 .note { font-size: 12px; color: var(--usu); margin: 6px 0; line-height: 1.6; }
 .install { background: #fff; border: 1px solid var(--ai); border-radius: 6px; padding: 10px 12px; margin-bottom: 14px; }
 .install p { margin: 0; font-size: 13px; line-height: 1.6; }
 .install[hidden], .install [hidden] { display: none; }
-a.btn { text-decoration: none; text-align: center; flex: 1; }
-.credit {font-size: 10px; color: #9a8a7a; text-align: center; margin-top: 28px; }
+a.btn { text-decoration: none; text-align: center; flex: 1; display: inline-flex; align-items: center; justify-content: center; }
+.credit {font-size: 11px; color: var(--ho); text-align: center; margin-top: 28px; }
 .credit a { color: inherit; }
-mark {background: #fbe3b5; color: inherit; }
+mark {background: var(--sen); color: inherit; font-weight: 700; }
 
 button { font-family: inherit; cursor: pointer; }
 .go { background: var(--aka); color: #fff; border: none; border-radius: 4px; padding: 8px 12px; font-size: 14px; }
 .go:active { opacity: .8; }
-.go.done { background: #9a8a7a; }
+.go.done { background: var(--ho); }
+.go, .sub, .danger { min-height: 36px; } /* 指で押しやすい高さ */
 .sub { background: #fff; color: var(--ai); border: 1px solid var(--ai); border-radius: 4px; padding: 8px 12px; font-size: 14px; }
 .danger { background: #fff; color: var(--aka); border: 1px solid var(--aka); border-radius: 4px; padding: 8px 12px; font-size: 14px; }
 .wide { width: 100%; padding: 12px; font-size: 15px; background: var(--ai); color: #fff; border: none; border-radius: 6px; }
@@ -98,12 +101,12 @@ dialog::backdrop { background: rgba(20, 20, 30, .45); }
 .dlg label { font-size: 12px; color: var(--usu); display: flex; flex-direction: column; gap: 4px; }
 .dlg-head { display: flex; align-items: center; gap: 8px; border-bottom: 2px solid var(--ai); padding-bottom: 6px; }
 .dlg-head h3 { flex: 1; margin: 0; font-size: 18px; font-family: "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif JP", serif; word-break: break-all; }
-.x { background: none; border: none; font-size: 24px; line-height: 1; color: var(--usu); padding: 0 4px; }
+.x { background: none; border: none; font-size: 22px; min-width: 36px; min-height: 36px; line-height: 1; color: var(--usu); padding: 0 4px; }
 
 .field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--usu); }
 .field .row { margin-top: 0; }
 .stars { display: flex; gap: 4px; }
-.stars button { flex: 1; background: #fff; border: 1px solid var(--waku); border-radius: 6px; font-size: 26px; line-height: 1; padding: 6px 0; color: #ddd2bf; }
+.stars button { flex: 1; background: #fff; border: 1px solid var(--waku); border-radius: 6px; font-size: 22px; line-height: 1; padding: 8px 0; color: var(--waku); }
 .stars button.on { color: var(--aka); border-color: var(--aka); }
 .photo { width: 100%; max-height: 26vh; object-fit: cover; border-radius: 6px; background: #fff; }
 .photo[hidden], .field [hidden] { display: none; }
@@ -119,33 +122,33 @@ dialog::backdrop { background: rgba(20, 20, 30, .45); }
   bottom: calc(16px + env(safe-area-inset-bottom));
   width: min(92vw, 400px);
   background: var(--sumi); color: #fff;
-  border-radius: 8px; padding: 10px 12px;
+  border-radius: 6px; padding: 10px 12px;
   display: flex; align-items: center; gap: 10px;
   font-size: 14px; box-shadow: 0 4px 14px rgba(0, 0, 0, .25);
 }
 .toast[hidden] { display: none; }
 .toast span { flex: 1; }
-.toast button { background: none; border: 1px solid #fff; color: #fff; border-radius: 4px; padding: 6px 10px; font-size: 13px; }
+.toast button { background: none; border: 1px solid #fff; color: #fff; border-radius: 4px; padding: 8px 12px; font-size: 13px; min-height: 36px; }
 .toast button[hidden] { display: none; }
 
 /* 地図（行った店のピン） */
-.map { height: 320px; border-radius: 6px; border: 1px solid var(--waku); background: #e8e2d6; z-index: 0; }
+.map { height: 320px; border-radius: 6px; border: 1px solid var(--waku); background: var(--sen); z-index: 0; }
 .pin { background: var(--ai); color: #fff; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 1px 4px rgba(0,0,0,.35);
   display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
 .pin.many { background: var(--aka); }
 .pop b { font-size: 14px; }
 .pop .dist { display: block; margin: 2px 0 6px; }
-.pop button { font-size: 13px; padding: 6px 10px; }
+.pop button { font-size: 13px; padding: 8px 12px; }
 
 /* おすすめ */
-.tag { font-size: 11px; padding: 2px 6px; border-radius: 3px; border: 1px solid var(--ai); color: var(--ai); white-space: nowrap; }
+.tag { font-size: 11px; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--ai); color: var(--ai); white-space: nowrap; }
 .tag.again { border-color: var(--aka); color: var(--aka); }
-.pin.rec { background: #d4a017; font-size: 14px; }
-.pop a.btn { display: inline-block; font-size: 13px; padding: 6px 10px; text-decoration: none; }
+.pin.rec { background: var(--kin); font-size: 14px; }
+.pop a.btn { display: inline-flex; font-size: 13px; padding: 8px 12px; text-decoration: none; }
 
 /* みんなで共有 */
 .seg { display: flex; margin-bottom: 8px; border: 1px solid var(--ai); border-radius: 6px; overflow: hidden; }
-.seg button { flex: 1; border: none; background: #fff; color: var(--ai); padding: 7px; font-size: 13px; }
+.seg button { flex: 1; border: none; background: #fff; color: var(--ai); padding: 7px; font-size: 13px; min-height: 36px; }
 .seg button.on { background: var(--ai); color: #fff; }
 .share label { font-size: 12px; color: var(--usu); display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
 .share .row input { flex: 1; margin: 0; }
@@ -154,7 +157,7 @@ dialog::backdrop { background: rgba(20, 20, 30, .45); }
 .map.picking { outline: 3px solid var(--aka); cursor: crosshair; }
 
 /* 検索窓の下の「Googleマップで探す」 */
-.gmap { display: block; margin: 0 0 10px; padding: 8px 12px; background: #fff; border: 1px solid var(--ai); border-radius: 6px;
+.gmap { display: block; margin: 0 0 10px; padding: 10px 12px; background: #fff; border: 1px solid var(--ai); border-radius: 6px;
   color: var(--ai); font-size: 13px; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gmap[hidden] { display: none; }
 
@@ -171,7 +174,7 @@ button.gmap { width: 100%; text-align: left; font-family: inherit; }
 .fold[open] > summary { margin-bottom: 6px; }
 
 /* 一覧の並べ方（小さめの切りかえ） */
-.seg.small button { padding: 5px; font-size: 12px; }
+.seg.small button { padding: 5px; font-size: 13px; }
 .seg[hidden] { display: none; }
 /* 地図のまとまり（近くの店をまとめた丸） */
 .pin.cluster { background: #fff; color: var(--ai); border: 3px solid var(--ai); font-size: 11px; }

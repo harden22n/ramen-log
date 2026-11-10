@@ -637,7 +637,7 @@ function renderMap() {
 function showHere(pos) {
   if (!map) return;
   if (hereLayer) hereLayer.remove();
-  hereLayer = L.circleMarker([pos.lat, pos.lon], { radius: 7, color: '#fff', weight: 2, fillColor: '#2a7ae2', fillOpacity: 1 })
+  hereLayer = L.circleMarker([pos.lat, pos.lon], { radius: 7, color: '#fff', weight: 2, fillColor: '#2b2420' /* --sumi（今いる場所） */, fillOpacity: 1 })
     .bindTooltip('今いる場所').addTo(map);
 }
 
